@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rakip Tarama</title>
+  <style>
+    body{font-family:Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:20px}
+    #rakipRoot{max-width:1320px;margin:0 auto}
+    #rakipRoot.rakip-fullscreen{max-width:none;width:100%;height:100vh}
+    .card{background:#111827;border:1px solid #334155;border-radius:12px;padding:14px}
+    .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+    input,select,button{height:36px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#e2e8f0;padding:0 10px}
+    table{width:100%;border-collapse:collapse;min-width:980px}
+    th,td{border-bottom:1px solid #334155;padding:8px;text-align:left;font-size:13px}
+    .hint{color:#94a3b8;font-size:13px}
+  </style>
+</head>
+<body>
+  <main id="rakipRoot">
+    <section class="card">
+      <h2>Rakip Tarama</h2>
+      <div class="row">
+        <select id="selPlatform">
+          <option value="">Platform seç</option>
+          <option value="hepsi">hepsi</option>
+          <option value="tiktok">tiktok</option>
+          <option value="instagram">instagram</option>
+          <option value="youtube">youtube</option>
+          <option value="twitter">twitter</option>
+        </select>
+        <select id="selService" disabled></select>
+        <input id="inpQtyMin" type="text" placeholder="Min adet" />
+        <input id="inpQtyMax" type="text" placeholder="Max adet" />
+        <input id="inpRakipPageCount" type="number" min="1" max="50" value="1" />
+        <input id="inpScanSpeed" type="number" min="1" max="100" value="3" />
+        <button id="btnRakipStart" type="button">Taramayı Başlat</button>
+        <button id="btnRakipStop" type="button">Durdur</button>
+        <button id="btnRakipClear" type="button">Temizle</button>
+        <button id="btnRakipFullscreen" class="btnFullscreen" type="button">TAM EKRAN GÖSTER</button>
+      </div>
+      <div class="row">
+        <input id="inpRakipRegex" type="text" placeholder="Regex gir (opsiyonel)" style="min-width:320px" />
+        <button id="btnRakipRegexTest" type="button">Regex Test</button>
+        <button id="btnRakipCopyMd" type="button">MD Kopyala</button>
+        <button id="btnRakipExportJson" type="button">JSON Export</button>
+        <button id="btnRakipExportCsv" type="button">CSV Export</button>
+      </div>
+      <div id="rakipStatusLine" class="hint">Durum: hazır</div>
+      <div id="rakipStats" class="hint">Toplam bulunan: 0 • Dedup atılan: 0 • Sayfa başına: —</div>
+      <div id="rakipRegexPreview" class="hint"></div>
+      <div style="overflow:auto;margin-top:10px">
+        <table>
+          <thead><tr><th>Platform</th><th>İlan Başlığı</th><th>Hizmet</th><th>Mağaza</th><th>Garanti</th><th>Fiyat</th><th>Reklam</th></tr></thead>
+          <tbody id="tblRakipBody"></tbody>
+        </table>
+      </div>
+      <div id="marketEmpty" class="hint">Henüz rakip verisi yok.</div>
+    </section>
+  </main>
+  <script src="rakip.js"></script>
+</body>
+</html>
