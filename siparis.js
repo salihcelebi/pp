@@ -137,6 +137,7 @@
             if (orderNo || smmId) {
               rows.push({ title, orderNo, smmId, dateTime, statusRaw, totalTl, username, error: '' });
             }
+            if (orderNo || smmId) rows.push({ title, orderNo, smmId, dateTime, statusRaw, totalTl, username, error: '' });
           } catch (e) {
             rows.push({ title: '', orderNo: '', smmId: '', dateTime: '', statusRaw: '', totalTl: '', username: '', error: String(e?.message || e) });
           }

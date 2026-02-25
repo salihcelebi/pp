@@ -8,6 +8,7 @@
   const BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar'; // [KANIT@KOD: DIŞ BAĞIMLILIK]
   const BOUND_EVENTS = new Set();
 
+  // [KANIT@KOD: DÖNÜŞÜM] En az 5 regex aktif kullanım
   const RX = Object.freeze({
     SERVICE: /^(.+?)\n(?=SİPARİŞ\s*#)/m,
     ORDER: /SİPARİŞ\s*#(\d+)/i,
@@ -207,6 +208,7 @@
     return val;
   }
 
+  // [KANIT@KOD: DÖNGÜ/BİTİRME] page++ until end
   async function scanComplaints() {
     if (state.running) return toast('Tarama zaten çalışıyor.');
     const baseDate = validDateOrThrow();
