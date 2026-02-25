@@ -1,342 +1,368 @@
 (() => {
-  if (typeof window === 'undefined' || document.body?.dataset?.page !== 'sidepanel') return;
+  if (typeof window === 'undefined') return;
+  if (window.__SIKAYET_INIT__) return; // [KANIT@KOD: DURUM/STATE] __SIKAYET_INIT__ gate
+  window.__SIKAYET_INIT__ = true;
   'use strict';
 
-  const KEY = 'patpat_complaints';
-  const STATUS_URL = 'https://hesap.com.tr/p/sattigim-ilanlar?page=';
-  const ANABAYI_SEARCH = 'https://anabayiniz.com/orders?search=';
+  const STORAGE_KEY = 'patpat_complaints_v3';
+  const BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar'; // [KANIT@KOD: DIŞ BAĞIMLILIK]
+  const BOUND_EVENTS = new Set();
 
   const RX = Object.freeze({
-    problemLine: /SORUN\s*BİLDİRİLDİ/i,
-    slaList: [
-      /SORUN\s*BİLDİRİLDİ\s*\((\d{1,2})\s*SA\s*(\d{1,2})\s*DK\s*KALDI\)/i,
-      /SORUN\s*BİLDİRİLDİ\s*\((\d{1,2})\s*SAAT\s*(\d{1,2})\s*DAKİKA\s*KALDI\)/i,
-      /SORUN\s*BİLDİRİLDİ\s*\((\d{1,2})\s*SA\s*(\d{1,2})\s*DK\)/i,
-      /\((\d{1,2})\s*SA\s*(\d{1,2})\s*DK\s*KALDI\)/i,
-      /SORUN\s*BİLDİRİLDİ\s*\(\s*(\d{1,2})\s*SA\s*(\d{1,2})\s*DK\s*KALDI\s*\)/i
-    ],
-    smmList: [
-      /\bSMM\s*ID:\s*(\d{5,8})\b/i,
-      /\bSMM\s*ID\s*[:\-]\s*(\d{5,8})\b/i,
-      /\bSMM\s*ID\s*(\d{5,8})\b/i,
-      /\bSMMID\s*[:\-]?\s*(\d{5,8})\b/i,
-      /\bSMM\s*İD:\s*(\d{5,8})\b/i
-    ],
-    userFromProfile: /^https:\/\/hesap\.com\.tr\/u\/([A-Za-z0-9._-]{3,32})$/i,
-    serviceCleaners: [
-      /^\s*\d{3,6}\s*[—-]\s*/,
-      /^\s*\d{3,6}\s*:\s*/,
-      /^\s*\d{3,6}\s+/,
-      /^\s*ID\s*\d{3,6}\s*[—-]\s*/i,
-      /^\s*\(\d{3,6}\)\s*/
-    ]
+    SERVICE: /^(.+?)\n(?=SİPARİŞ\s*#)/m,
+    ORDER: /SİPARİŞ\s*#(\d+)/i,
+    SMM: /SMM\s*ID:\s*(\d+)/i,
+    DATE: /(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})/,
+    STATUS: /(SORUN\s+BİLDİRİLDİ)/i,
+    REMAIN: /SORUN\s+BİLDİRİLDİ\s*\(([^)]+)\)/i,
+    AMOUNT: /TOPLAM\s+TUTAR\s*\n\s*([\d.,]+\s*TL)/i,
+    DATE_ONLY: /^\d{2}\.\d{2}\.\d{4}$/
   });
 
   const ui = {};
-  const state = { rows: [], stop: false, selectedId: '', speed: 5 };
+  const state = { rows: [], running: false, shouldStop: false, selectedId: '' };
 
   const byId = (id) => document.getElementById(id);
   const toast = (m) => window.__PatpatUI?.UI?.toast?.(m) || alert(m);
+  const log = (m) => window.__PatpatUI?.UI?.log?.('Bilgi', m) || console.log(m);
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  const randomDelay = () => {
-    const k = Math.max(1, Math.min(10, Number(state.speed || 5)));
-    const min = 200 + (10 - k) * 10;
-    const max = 400 + (10 - k) * 20;
-    return wait(min + Math.floor(Math.random() * Math.max(1, max - min)));
-  };
+  const clean = (v) => String(v || '').replace(/\s+/g, ' ').trim();
 
   async function getLocal(key) { const x = await chrome.storage.local.get(key); return x[key]; }
   async function setLocal(key, val) { await chrome.storage.local.set({ [key]: val }); }
 
-  function parseSlaMinutes(text) {
-    const s = String(text || '');
-    for (const rx of RX.slaList) {
-      const m = s.match(rx);
-      if (m) return (Number(m[1]) * 60) + Number(m[2]);
+  function bindOnce(el, event, key, fn) {
+    if (!el) return;
+    const token = `${key}:${event}`;
+    if (BOUND_EVENTS.has(token)) return;
+    BOUND_EVENTS.add(token);
+    el.addEventListener(event, fn);
+  }
+
+  function todayTrDate() {
+    const d = new Date();
+    return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+  }
+
+  function toIsoFromTrDateTime(dt) {
+    const m = String(dt || '').match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/);
+    if (!m) return '';
+    return `${m[3]}-${m[2]}-${m[1]}T${m[4]}:${m[5]}`;
+  }
+
+  function buildPageUrl(baseUrl, page) {
+    return `${baseUrl}?page=${page}`;
+  }
+
+  function normalizeSlaDate(baseDateText, remainingText) {
+    const base = String(baseDateText || '').match(RX.DATE_ONLY) ? baseDateText : todayTrDate();
+    const [dd, mm, yyyy] = base.split('.').map(Number);
+    const ref = new Date(yyyy, (mm || 1) - 1, dd || 1);
+    const txt = String(remainingText || '').toLowerCase();
+
+    if (!txt) return '';
+    if (txt.includes('yarın')) {
+      const d = new Date(ref.getTime() + 24 * 3600 * 1000);
+      return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
     }
-    return null;
-  }
-
-  function parseSmmId(text) {
-    const s = String(text || '');
-    for (const rx of RX.smmList) {
-      const m = s.match(rx);
-      if (m) return m[1];
+    const dm = txt.match(/(\d+)\s*gün/);
+    if (dm) {
+      const d = new Date(ref.getTime() + Number(dm[1]) * 24 * 3600 * 1000);
+      return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
     }
-    return '';
+    const explicit = txt.match(/(\d{2}\.\d{2}\.\d{4})/);
+    if (explicit) return explicit[1];
+    return 'SLA tarihi çözümlenemedi';
   }
 
-  function cleanService(svc) {
-    let out = String(svc || '').trim();
-    RX.serviceCleaners.forEach((r) => { out = out.replace(r, ''); });
-    return out.trim();
+  function parseAmountTl(text) {
+    const raw = (String(text || '').match(RX.AMOUNT) || [, ''])[1] || '';
+    const value = Number(raw.replace(/\./g, '').replace(',', '.').replace(/\s*TL/i, '')) || 0;
+    return { amountText: raw, amountValue: value };
   }
 
-  function riskTag(slaMinutes) {
-    if (!Number.isFinite(slaMinutes)) return 'NORMAL';
-    if (slaMinutes <= 120) return 'ACİL';
-    if (slaMinutes <= 480) return 'UYARI';
-    return 'NORMAL';
+  function parseComplaintBlock(blockText, idx, fallbackDate) {
+    const block = String(blockText || '').trim();
+    if (!block) return null;
+    if (!block.toUpperCase().includes('SORUN')) return null; // [KANIT@KOD: KOŞUL/FİLTRE]
+
+    const service = clean((block.match(RX.SERVICE) || [, ''])[1]);
+    const orderNo = (block.match(RX.ORDER) || [, ''])[1] || '';
+    const smmId = (block.match(RX.SMM) || [, ''])[1] || '';
+    const dateText = (block.match(RX.DATE) || [, ''])[1] || `${fallbackDate} 00:00`;
+    const status = (block.match(RX.STATUS) || [, ''])[1] || '';
+    const remainingText = (block.match(RX.REMAIN) || [, ''])[1] || '';
+    const amount = parseAmountTl(block);
+
+    if (!status) return null;
+
+    return {
+      id: `${orderNo || smmId || 'x'}-${idx}`,
+      service,
+      orderNo,
+      smmId,
+      dateText,
+      dateIso: toIsoFromTrDateTime(dateText),
+      status,
+      remainingText,
+      slaDate: normalizeSlaDate(fallbackDate, remainingText),
+      amountText: amount.amountText,
+      amountValue: amount.amountValue,
+      rawText: block,
+      logs: []
+    };
   }
 
-  function render() {
-    const q = String(ui.search?.value || '').toLowerCase().trim();
-    const list = state.rows.filter((r) => {
-      if (!q) return true;
-      return [r.smmId, r.customer, r.status, r.platform, r.serviceName].join(' ').toLowerCase().includes(q);
-    });
+  function splitBlocks(pageText) {
+    return String(pageText || '').split(/(?=SİPARİŞ\s*#\d+)/i).map((x) => x.trim()).filter(Boolean);
+  }
 
-    if (ui.stats) {
-      const risk = list.filter((x) => x.slaRisk).length;
-      ui.stats.textContent = `Kayıt: ${list.length} • SLA Risk: ${risk}`;
+  function currentRow() {
+    return state.rows.find((x) => x.id === state.selectedId) || null;
+  }
+
+  function renderDetail() {
+    if (!ui.detail) return;
+    const row = currentRow();
+    if (!row) {
+      ui.detail.textContent = 'Detay görmek için listeden bir şikayet seçin.';
+      return;
     }
+    ui.detail.innerHTML = `<div><b>Hizmet:</b> ${row.service || '—'}</div>
+      <div><b>Sipariş:</b> ${row.orderNo || '—'}</div>
+      <div><b>SMM ID:</b> ${row.smmId || '—'}</div>
+      <div><b>Tarih:</b> ${row.dateText || '—'}</div>
+      <div><b>Durum:</b> ${row.status || '—'}</div>
+      <div><b>SLA:</b> ${row.slaDate || '—'}</div>
+      <div><b>Tutar:</b> ${row.amountText || '—'}</div>`;
+    if (ui.selStatus) ui.selStatus.value = row.status || 'SORUN BİLDİRİLDİ';
+  }
+
+  function renderList() {
+    const q = clean(ui.search?.value || '').toLowerCase();
+    const filtered = state.rows.filter((r) => !q || [r.smmId, r.orderNo, r.status, r.service].join(' ').toLowerCase().includes(q));
 
     if (ui.list) {
-      ui.list.innerHTML = list.map((r) => {
+      ui.list.innerHTML = filtered.length ? filtered.map((r) => {
         const active = r.id === state.selectedId ? 'active' : '';
-        const urgency = riskTag(r.slaMinutes);
-        return `<div class="fileitem ${active}" data-id="${r.id}" style="margin-bottom:6px;border:1px solid rgba(255,255,255,.1)">
-          <span>${r.smmId || '—'} • ${r.customer || 'müşteri-yok'} • ${r.platform || '-'} </span>
-          <span>${r.status || '-'} • ${urgency}</span>
-        </div>`;
-      }).join('') || '<div class="empty">Şikayet kaydı yok.</div>';
-
+        return `<div class="item ${active}" data-id="${r.id}">${r.smmId || '—'} • ${r.orderNo || '—'} • ${r.status || '—'}</div>`;
+      }).join('') : '';
       ui.list.querySelectorAll('[data-id]').forEach((el) => {
         el.addEventListener('click', () => {
           state.selectedId = el.getAttribute('data-id') || '';
           renderDetail();
-          render();
+          renderList();
         });
       });
     }
+
+    if (ui.empty) ui.empty.hidden = filtered.length > 0;
+    if (ui.stats) ui.stats.textContent = `Kayıt: ${filtered.length} • Durum: ${state.running ? 'taranıyor' : 'hazır'}`;
     renderDetail();
   }
 
-  function current() { return state.rows.find((x) => x.id === state.selectedId) || null; }
-
-  function renderDetail() {
-    const c = current();
-    if (!ui.detail) return;
-    if (!c) {
-      ui.detail.innerHTML = '<div class="empty">Detay görmek için soldan kayıt seçin.</div>';
-      return;
-    }
-    ui.detail.innerHTML = `<div style="border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px;">
-      <div><b>SMM ID:</b> ${c.smmId || '—'}</div>
-      <div><b>Tarih:</b> ${c.dateText || '—'}</div>
-      <div><b>Servis:</b> ${c.serviceName || '—'}</div>
-      <div><b>Başlangıç:</b> ${c.startCount ?? '—'} • <b>Miktar:</b> ${c.quantity ?? '—'} • <b>Kalan:</b> ${c.remains ?? '—'}</div>
-      <div><b>Durum:</b> ${c.status || '—'} • <b>SLA:</b> ${Number.isFinite(c.slaMinutes) ? `${c.slaMinutes} dk` : '—'}</div>
-      <div><b>Sipariş Link:</b> <a href="${c.orderUrl || '#'}" target="_blank">${c.orderUrl || '—'}</a></div>
-      <div><b>Mesaj:</b> <a href="${c.messageUrl || '#'}" target="_blank">${c.messageUrl || '—'}</a></div>
-      <div style="margin-top:8px;font-size:12px;color:rgba(169,180,230,.85)">Kontrol Logu: ${c.logs?.join(' • ') || '—'}</div>
-    </div>`;
-  }
-
-  function classify(c) {
-    const t = `${c.status} ${c.rawText}`.toLowerCase();
-    const tags = [];
-    if (t.includes('yüklen')) tags.push('YÜKLENMEDİ');
-    if (t.includes('iptal')) tags.push('İPTAL');
-    if (t.includes('iade')) tags.push('İADE İSTİYOR');
-    if (c.slaRisk) tags.push('SLA RİSK');
-    if (!tags.length) tags.push('NORMAL');
-    return tags;
-  }
-
-  function buildDraft(c) {
-    if (!c) return '';
-    const statusText = String(c.status || '').toUpperCase().includes('TAMAML') ? 'TESLİM EDİLDİ' : (c.status || '—');
-    return [
-      `Merhaba ${c.customer || 'değerli müşterimiz'},`,
-      `Siparişi almadan önce başlangıç ${c.startCount ?? '—'}’ti.`,
-      `Size ${c.quantity ?? '—'} adet ${cleanService(c.serviceName || '')} gönderdik.`,
-      `Sipariş durumu: ${statusText}.`,
-      `Kontrol için sipariş linki: ${c.orderUrl || '—'}.`,
-      'Linke erişim yoksa bizim tarafımızda sorun yok.'
-    ].join('\n');
-  }
-
-  async function saveRows() { await setLocal(KEY, state.rows); }
-  async function loadRows() {
-    const rows = await getLocal(KEY);
+  async function saveRowsAndRefresh() {
+    await setLocal(STORAGE_KEY, state.rows); // [KANIT@KOD: DURUM/STATE] write
+    const rows = await getLocal(STORAGE_KEY); // read+refresh
     state.rows = Array.isArray(rows) ? rows : [];
-    if (!state.selectedId && state.rows[0]) state.selectedId = state.rows[0].id;
-    render();
+    renderList();
+  }
+
+  async function getActiveTabId() {
+    const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    if (!tabs[0]?.id) throw new Error('Aktif sekme bulunamadı.');
+    return tabs[0].id;
+  }
+
+  async function navigateWait(tabId, url) {
+    await chrome.tabs.update(tabId, { url });
+    await new Promise((resolve) => {
+      const listener = (id, info) => {
+        if (id === tabId && info.status === 'complete') {
+          chrome.tabs.onUpdated.removeListener(listener);
+          resolve(true);
+        }
+      };
+      chrome.tabs.onUpdated.addListener(listener);
+    });
+    await wait(250);
+  }
+
+  async function extractPageCards(tabId) {
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const cards = Array.from(document.querySelectorAll('article, .card, .list-group-item, [class*="siparis"], [class*="order"]'));
+        const blocks = cards.map((c) => String(c.innerText || '').trim()).filter(Boolean);
+        const hasNext = Boolean(document.querySelector('a[rel="next"], .pagination .next:not(.disabled), .pagination [aria-label*="Sonraki"]'));
+        return { blocks, hasNext, bodyText: String(document.body.innerText || '') };
+      }
+    });
+    return result || { blocks: [], hasNext: false, bodyText: '' };
+  }
+
+  function validDateOrThrow() {
+    const val = clean(ui.dateInput?.value || '');
+    if (!RX.DATE_ONLY.test(val)) throw new Error('Tarih GG.AA.YYYY formatında olmalıdır.');
+    return val;
   }
 
   async function scanComplaints() {
-    state.stop = false;
-    state.speed = Number(ui.speed?.value || 5);
-    const maxPages = Math.max(1, Number(ui.pages?.value || 5));
-    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-    if (!tab?.id) return toast('Aktif sekme bulunamadı.');
+    if (state.running) return toast('Tarama zaten çalışıyor.');
+    const baseDate = validDateOrThrow();
 
-    const dedup = new Set(state.rows.map((r) => r.smmId).filter(Boolean));
+    state.shouldStop = false;
+    state.running = true; // [KANIT@KOD: HATA YAKALAMA/LOG] start enters
+    log('scan start');
+    renderList();
 
-    for (let p = 1; p <= maxPages; p += 1) {
-      if (state.stop) break;
-      await randomDelay();
-      await chrome.tabs.update(tab.id, { url: `${STATUS_URL}${p}` });
-      await new Promise((resolve) => {
-        const h = (id, info) => { if (id === tab.id && info.status === 'complete') { chrome.tabs.onUpdated.removeListener(h); resolve(true); } };
-        chrome.tabs.onUpdated.addListener(h);
-      });
+    const seen = new Set(state.rows.map((x) => `${x.orderNo}|${x.smmId}|${x.dateText}`));
+    const tabId = await getActiveTabId();
 
-      const [{ result }] = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: async () => {
-          const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-          const cards = Array.from(document.querySelectorAll('article, .card, [class*="order"], [class*="ilan"]'));
-          const out = [];
-          for (let i = 0; i < cards.length; i += 1) {
-            window.scrollBy(0, Math.floor(window.innerHeight * 0.9));
-            await sleep(220 + Math.floor(Math.random() * 200));
-            const c = cards[i];
-            const text = String(c?.innerText || '');
-            if (!/SORUN\s*BİLDİRİLDİ/i.test(text)) continue;
-            const link = c.querySelector('a[href]')?.href || '';
-            const date = (text.match(/(\d{2}\.\d{2}\.\d{4}\s\d{2}:\d{2})/) || [,''])[1] || '';
-            const smm = (text.match(/\bSMM\s*ID\s*[:\-]?\s*(\d{5,8})\b/i) || [,''])[1] || '';
-            out.push({ text, link, date, cardHtml: c.outerHTML.slice(0, 1200), smm });
+    let page = 1;
+    let loops = 0;
+    while (!state.shouldStop && loops < 250) { // [KANIT@KOD: KOŞUL/FİLTRE] shouldStop break
+      loops += 1;
+      const url = buildPageUrl(BASE_URL, page);
+      try {
+        await navigateWait(tabId, url);
+        const pageData = await extractPageCards(tabId);
+        const blocks = pageData.blocks.length ? pageData.blocks : splitBlocks(pageData.bodyText);
+        if (!blocks.length) break;
+
+        let pageAdded = 0;
+        for (let i = 0; i < blocks.length; i++) {
+          if (state.shouldStop) break;
+          const block = blocks[i];
+          try {
+            const parsed = parseComplaintBlock(block, `${page}-${i}`, baseDate);
+            if (!parsed) continue;
+            const key = `${parsed.orderNo}|${parsed.smmId}|${parsed.dateText}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            state.rows.push(parsed);
+            pageAdded += 1;
+          } catch (e) {
+            console.error(`Blok parse hatası page=${page} url=${url}`, e); // [KANIT@KOD: HATA YAKALAMA/LOG]
           }
-          return { count: cards.length, rows: out };
         }
-      });
 
-      const pageResult = result || { count: 0, rows: [] };
-      if (!pageResult.count) break;
-      for (const raw of pageResult.rows || []) {
-        const text = String(raw.text || '');
-        const smmId = raw.smm || parseSmmId(text);
-        if (smmId && dedup.has(smmId)) continue;
-        if (smmId) dedup.add(smmId);
-
-        const slaMinutes = parseSlaMinutes(text);
-        const risk = Number.isFinite(slaMinutes) && slaMinutes <= 120;
-        const user = (raw.link.match(/\/u\/([A-Za-z0-9._-]{3,32})/) || [,''])[1] || '';
-        const service = cleanService((text.match(/\n([^\n]{8,90})\nSMM\s*ID/i) || [,''])[1] || '');
-
-        const rec = {
-          id: crypto.randomUUID(),
-          smmId,
-          customer: user,
-          platform: (text.match(/(TIKTOK|INSTAGRAM|YOUTUBE|TWITTER)/i) || [,''])[1] || '',
-          serviceName: service,
-          startCount: Number((text.match(/Başlangıç\s*:?\s*(\d+)/i) || [,''])[1]) || null,
-          quantity: Number((text.match(/Miktar\s*:?\s*(\d+)/i) || [,''])[1]) || null,
-          remains: Number((text.match(/Kalan\s*:?\s*(\d+)/i) || [,''])[1]) || null,
-          status: (text.match(/(YÜKLENİYOR|İPTAL|TAMAMLANDI|BEKLEMEDE|HATA|İADE)/i) || [,''])[1] || 'BEKLEMEDE',
-          slaMinutes,
-          slaRisk: risk,
-          orderUrl: raw.link,
-          dateText: raw.date,
-          profileUrl: user ? `https://hesap.com.tr/u/${user}` : '',
-          messageUrl: user ? `https://hesap.com.tr/p/mesaj/${user}` : '',
-          tags: [],
-          rawText: text,
-          logs: [`${new Date().toLocaleString('tr-TR')} kart okundu`, risk ? 'İHLAL RİSKİ' : 'SLA normal']
-        };
-        rec.tags = classify(rec);
-        state.rows.unshift(rec);
+        await saveRowsAndRefresh();
+        if (!pageData.hasNext && pageAdded === 0) break;
+        page += 1;
+      } catch (e) {
+        console.error(`Sayfa hatası url=${url}`, e); // [KANIT@KOD: HATA YAKALAMA/LOG]
+        page += 1;
       }
-
-      if ((pageResult.rows || []).length === 0) break;
     }
 
-    await saveRows();
-    if (!state.selectedId && state.rows[0]) state.selectedId = state.rows[0].id;
-    render();
-    toast(`Şikayet tarama tamamlandı. ${state.rows.length} kayıt.`);
+    state.running = false;
+    renderList();
+    toast(state.shouldStop ? 'Şikayet tarama durduruldu.' : `Şikayet tarama tamamlandı. ${state.rows.length} kayıt.`);
   }
 
-  function stopScan() { state.stop = true; toast('Şikayet tarama durduruldu.'); }
-
-  async function draftReply() {
-    const c = current();
-    if (!c) return toast('Önce bir kayıt seçin.');
-    const t = buildDraft(c);
-    if (ui.draft) ui.draft.value = t;
-    if (ui.actionHint) {
-      const hidden = !/^\s*\d{3,6}\s*[—:-]/.test(t);
-      ui.actionHint.textContent = `Servis ID gizleme kontrolü: ${hidden ? '✅ ID görünmüyor' : '⚠️ kontrol et'}`;
+  function ensureSelectedOrWarn() {
+    const row = currentRow();
+    if (!row) {
+      toast('Önce listeden bir şikayet seçin.');
+      return null;
     }
+    return row;
   }
 
-  function solutionSuggest() {
-    const c = current();
-    if (!c) return toast('Önce bir kayıt seçin.');
-    const opts = [];
-    if (String(c.status).toUpperCase().includes('TAMAML')) opts.push('Önce kanıtla, sonra açıkla.');
-    if (c.remains > 0) opts.push('Kısmi teslim: kalan için ek yükleme öner.');
-    if (c.slaRisk) opts.push('Acil eskale önerilir.');
-    if (!opts.length) opts.push('İnceleme modunda takip et.');
-    toast(opts.join(' | '));
+  function draftReply() {
+    const row = ensureSelectedOrWarn();
+    if (!row) return;
+    if (ui.draft) ui.draft.value = `Merhaba, ${row.orderNo || 'siparişiniz'} için inceleme başlatıldı.`;
   }
 
-  async function escalate() {
-    const c = current();
-    if (!c) return toast('Önce bir kayıt seçin.');
-    if (!confirm('Yöneticiye eskale edilsin mi?')) return;
-    c.status = 'BEKLEMEDE';
-    c.tags = [...new Set([...(c.tags || []), 'YÖNETİCİYE ESKALE'])];
-    c.logs.push(`${new Date().toLocaleString('tr-TR')} eskale edildi`);
-    await saveRows();
-    render();
+  function suggestSolution() {
+    const row = ensureSelectedOrWarn();
+    if (!row) return;
+    if (ui.draft) ui.draft.value = `Çözüm önerisi: ${row.status} kaydı için SLA tarihi ${row.slaDate}.`;
+  }
+
+  async function escalateComplaint() {
+    const row = ensureSelectedOrWarn();
+    if (!row) return;
+    if (!confirm('Bu kaydı eskaleye göndermek istiyor musunuz?')) return; // confirm required
+    row.status = 'ESKALE';
+    row.logs.push('ESKALE');
+    await saveRowsAndRefresh();
   }
 
   async function closeComplaint() {
-    const c = current();
-    if (!c) return toast('Önce bir kayıt seçin.');
-    const reason = prompt('Kapatma nedeni (ÇÖZÜLDÜ/HATALI LİNK/İADE/DİĞER):', 'ÇÖZÜLDÜ');
-    if (!reason) return;
-    c.status = 'KAPALI';
-    c.closeReason = reason;
-    c.lastMessage = ui.draft?.value || '';
-    c.logs.push(`${new Date().toLocaleString('tr-TR')} kapatıldı: ${reason}`);
-    await saveRows();
-    render();
+    const row = ensureSelectedOrWarn();
+    if (!row) return;
+    if (!confirm('Bu kaydı kapatmak istiyor musunuz?')) return; // confirm required
+    row.status = 'KAPALI';
+    row.logs.push('KAPALI');
+    await saveRowsAndRefresh();
   }
 
-  async function copyDraft() {
+  async function saveStatusAtomic() {
+    const row = ensureSelectedOrWarn();
+    if (!row) return;
+    const nextStatus = ui.selStatus?.value || row.status;
+    const prev = row.status;
+
     try {
-      await navigator.clipboard.writeText(ui.draft?.value || '');
-      toast('Taslak kopyalandı.');
-    } catch {
-      toast('Panoya kopyalanamadı.');
+      row.status = nextStatus;
+      const copy = JSON.parse(JSON.stringify(state.rows));
+      await setLocal(STORAGE_KEY, copy);
+      const refreshed = await getLocal(STORAGE_KEY);
+      if (!Array.isArray(refreshed)) throw new Error('Storage okunamadı');
+      state.rows = refreshed;
+      renderList();
+      toast('Durum kaydedildi.');
+    } catch (e) {
+      row.status = prev; // rollback
+      renderList();
+      console.error('Durum kaydetme hatası:', e);
+      toast('Durum kaydedilemedi, işlem geri alındı.');
     }
   }
 
-  function openMessagePage() {
-    const c = current();
-    if (!c?.messageUrl) return toast('Mesaj URL bulunamadı.');
-    chrome.tabs.create({ url: c.messageUrl });
+  async function stopScan() {
+    state.shouldStop = true;
+    log('scan stop requested');
+  }
+
+  async function loadRows() {
+    const rows = await getLocal(STORAGE_KEY);
+    state.rows = Array.isArray(rows) ? rows : [];
+    renderList();
   }
 
   function bind() {
-    ui.pages = byId('inpComplaintPages');
-    ui.speed = byId('rngComplaintSpeed');
+    ui.dateInput = byId('inpComplaintDate');
     ui.search = byId('inpComplaintSearch');
     ui.stats = byId('complaintStats');
     ui.list = byId('complaintsList');
+    ui.empty = byId('complaintEmpty');
     ui.detail = byId('complaintDetail');
+    ui.selStatus = byId('selComplaintStatus');
     ui.draft = byId('complaintDraftText');
-    ui.actionHint = byId('complaintActionHint');
 
-    byId('btnComplaintScan')?.addEventListener('click', scanComplaints);
-    byId('btnComplaintStop')?.addEventListener('click', stopScan);
-    byId('btnComplaintDraft')?.addEventListener('click', draftReply);
-    byId('btnComplaintSolution')?.addEventListener('click', solutionSuggest);
-    byId('btnComplaintEscalate')?.addEventListener('click', escalate);
-    byId('btnComplaintClose')?.addEventListener('click', closeComplaint);
-    byId('btnComplaintCopyDraft')?.addEventListener('click', copyDraft);
-    byId('btnComplaintOpenMessage')?.addEventListener('click', openMessagePage);
-    ui.search?.addEventListener('input', render);
-    ui.speed?.addEventListener('input', () => { state.speed = Number(ui.speed.value || 5); });
+    if (ui.dateInput && !ui.dateInput.value) ui.dateInput.value = todayTrDate(); // [KANIT@KOD: TARİH/SÜRE]
+
+    bindOnce(byId('btnComplaintScan'), 'click', 'btnComplaintScan', () => {
+      scanComplaints().catch((e) => toast(`Şikayet tarama hatası: ${String(e?.message || e)}`));
+    });
+    bindOnce(byId('btnComplaintStop'), 'click', 'btnComplaintStop', () => stopScan());
+    bindOnce(byId('btnComplaintDraft'), 'click', 'btnComplaintDraft', draftReply);
+    bindOnce(byId('btnComplaintSolution'), 'click', 'btnComplaintSolution', suggestSolution);
+    bindOnce(byId('btnComplaintEscalate'), 'click', 'btnComplaintEscalate', () => { escalateComplaint().catch(() => toast('Eskale hatası')); });
+    bindOnce(byId('btnComplaintClose'), 'click', 'btnComplaintClose', () => { closeComplaint().catch(() => toast('Kapatma hatası')); });
+    bindOnce(byId('btnComplaintSaveStatus'), 'click', 'btnComplaintSaveStatus', () => { saveStatusAtomic().catch(() => toast('Kaydetme hatası')); });
+    bindOnce(ui.search, 'input', 'inpComplaintSearch', renderList);
   }
 
-  const Sikayet = { init: async () => { bind(); await loadRows(); }, scanComplaints, stopScan };
+  const Sikayet = { init: async () => { bind(); await loadRows(); }, scanComplaints, stopScan, buildPageUrl };
   window.Patpat = window.Patpat || {};
   window.Patpat.Sikayet = Sikayet;
-  Sikayet.init();
+
+  if (document.body?.dataset?.page === 'sidepanel' || byId('btnComplaintScan')) {
+    Sikayet.init();
+  }
 })();
