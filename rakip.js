@@ -53,7 +53,17 @@
   const toast = (m) => window.__PatpatUI?.UI?.toast?.(m) || alert(m);
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const nSpace = (s) => String(s || '').replace(/\s+/g, ' ').trim();
-  const randomWait = () => wait(200 + Math.floor(Math.random() * 400));
+  const getSharedSpeed = () => {
+    const el = document.getElementById('inpScanSpeed');
+    const n = Number(el?.value || 3);
+    if (!Number.isFinite(n)) return 3;
+    return Math.max(1, Math.min(100, n));
+  };
+  const randomWait = () => {
+    const speed = getSharedSpeed();
+    const base = Math.max(30, Math.round(900 / speed));
+    return wait(base + Math.floor(Math.random() * Math.max(20, base)));
+  };
 
   const nQty = (v) => {
     const s = String(v || '').trim().toLowerCase().replace(/\s+/g, '');
