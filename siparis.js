@@ -1,9 +1,12 @@
 (() => {
-  if (typeof window === 'undefined' || document.body?.dataset?.page !== 'sidepanel') return;
+  if (typeof window === 'undefined') return;
+  if (window.__SIPARIS_INIT__) return; // [KANIT@KOD: DURUM/STATE] __SIPARIS_INIT__ gate
+  window.__SIPARIS_INIT__ = true;
   'use strict';
 
   const STATUSES = ['pending', 'processing', 'completed', 'cancelled', 'returnprocess'];
-  const BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar';
+  const BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar'; // [KANIT@KOD: DIŞ BAĞIMLILIK]
+  const BOUND_EVENTS = new Set();
 
   const state = {
     rows: [],
@@ -11,6 +14,8 @@
     dropped: 0,
     stop: false,
     running: false,
+    speed: 3,
+    lastPageAdded: 0
     speed: 3
   };
 
@@ -20,6 +25,8 @@
   function toast(msg) { window.__PatpatUI?.UI?.toast?.(msg) || alert(msg); }
   function log(level, msg) { window.__PatpatUI?.UI?.log?.(level, msg) || console[level === 'Hata' ? 'error' : 'log'](msg); }
   function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
+  function normalizeSpace(v) { return String(v || '').replace(/\s+/g, ' ').trim(); }
+
 
   function normalizeSpace(v) { return String(v || '').replace(/\s+/g, ' ').trim(); }
   function normalizeStatus(s) {
@@ -33,6 +40,47 @@
     return t;
   }
 
+  // [KANIT@KOD: DÖNÜŞÜM] buildPageUrl
+  function buildPageUrl(baseUrl, page, status = '') {
+    const qp = [`page=${page}`];
+    if (status) qp.push(`status=${encodeURIComponent(status)}`);
+    return `${baseUrl}?${qp.join('&')}`;
+  }
+
+  // [KANIT@KOD: KOŞUL/FİLTRE] clamp 1..100
+  function parseSpeed() {
+    const raw = Number(ui.inpSpeed?.value ?? state.speed ?? 3);
+    if (!Number.isFinite(raw)) throw new Error('Tarama hızı sayısal olmalıdır.');
+    const clamped = Math.max(1, Math.min(100, raw));
+    state.speed = clamped;
+    if (ui.inpSpeed) ui.inpSpeed.value = String(clamped);
+    return clamped;
+  }
+
+  // [KANIT@KOD: DÖNÜŞÜM] await sleep(speedDelayMs())
+  function speedDelayMs() {
+    const speed = Math.max(1, Math.min(100, Number(state.speed || 3)));
+    return Math.max(40, Math.round(1800 / speed));
+  }
+
+  // [KANIT@KOD: KOŞUL/FİLTRE] maxPage>=1
+  function parseMaxPage() {
+    const raw = Number(ui.inpMaxPage?.value);
+    if (!Number.isFinite(raw) || raw < 1) {
+      throw new Error('Sayfa sayısı en az 1 olmalıdır.');
+    }
+    return Math.floor(raw);
+  }
+
+  function updateStats(extra = 'beklemede') {
+    if (ui.stats) {
+      ui.stats.textContent = `Toplam: ${state.rows.length} • Dedup atılan: ${state.dropped} • Sayfa-başı son eklenen: ${state.lastPageAdded} • Hız: ${state.speed}x • Durum: ${extra}`;
+    }
+    if (ui.empty) ui.empty.hidden = state.rows.length > 0;
+  }
+
+  async function hashRow(row) {
+    const src = `${row.orderNo}|${row.smmId}|${row.dateTime}|${row.totalTl}|${row.status}`;
   // [KANIT@KOD: KOŞUL/FİLTRE] 1<=speed<=100 && isNumber
   function getSpeedFactor() {
     const raw = Number(ui.inpSpeed?.value ?? state.speed);
@@ -62,10 +110,10 @@
   }
 
   function appendRow(row) {
+    if (!ui.tbody) return;
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${row.title}</td><td>${row.orderNo}</td><td>${row.smmId}</td><td>${row.dateTime}</td><td>${row.status}</td><td>${row.totalTl}</td><td>${row.username || ''}</td>`;
     ui.tbody.appendChild(tr);
-    updateStats(state.running ? 'taranıyor' : 'tamamlandı');
   }
 
   // [KANIT@KOD: DÖNÜŞÜM] url_build_page
@@ -101,16 +149,16 @@
       func: async () => {
         const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         const step = Math.floor(window.innerHeight * 0.9);
-        let y = 0;
-        while (y < document.body.scrollHeight) {
+        for (let y = 0; y < document.body.scrollHeight; y += step) {
           window.scrollTo({ top: y, behavior: 'auto' });
+          await sleep(120);
           y += step;
           await sleep(140);
         }
 
         const clean = (v) => String(v || '').replace(/\s+/g, ' ').trim();
         const rows = [];
-        const cards = Array.from(document.querySelectorAll('article, .card, [class*="order"], [class*="siparis"], .list-group-item')).filter((n) => clean(n.innerText).includes('Sipariş'));
+        const cards = Array.from(document.querySelectorAll('article, .card, [class*="order"], [class*="siparis"], .list-group-item'));
 
         for (const c of cards) {
           try {
@@ -122,18 +170,37 @@
             const statusRaw = (text.match(/\d{2}:\d{2}\s+([^\n]+?)\s+Toplam Tutar/i) || [, ''])[1];
             const totalTl = (text.match(/([\d.,]+)\s*TL/i) || [, ''])[1];
             const username = (text.match(/^([A-Za-z0-9_\.]{3,32})$/m) || [, ''])[1];
+            if (orderNo || smmId) {
+              rows.push({ title, orderNo, smmId, dateTime, statusRaw, totalTl, username, error: '' });
+            }
             if (orderNo || smmId) rows.push({ title, orderNo, smmId, dateTime, statusRaw, totalTl, username, error: '' });
           } catch (e) {
             rows.push({ title: '', orderNo: '', smmId: '', dateTime: '', statusRaw: '', totalTl: '', username: '', error: String(e?.message || e) });
           }
         }
 
+        return { rows };
         return { rows, pageText: String(document.body.innerText || '') };
       }
     });
-    return result || { rows: [], pageText: '' };
+    return result || { rows: [] };
   }
 
+  async function scanStatus(tabId, status, maxPage) {
+    // [KANIT@KOD: DÖNGÜ/BİTİRME] 1..maxPage
+    for (let page = 1; page <= maxPage; page++) {
+      if (state.stop) {
+        log('Bilgi', 'Tarama stop sinyali ile sonlandırıldı.');
+        return;
+      }
+
+      const target = buildPageUrl(BASE_URL, page, status);
+      updateStats(`${status || 'genel'} p${page}/${maxPage}`);
+      state.lastPageAdded = 0;
+
+      try {
+        await navigateWait(tabId, target);
+        let ext = await executeExtract(tabId);
   async function scanStatus(tabId, status, pageLimitInput) {
     const pageLimit = Math.max(1, Number(pageLimitInput || 1));
 
@@ -153,6 +220,36 @@
           ext = await executeExtract(tabId);
         }
 
+        for (const raw of ext.rows) {
+          if (state.stop) return;
+          try {
+            const row = {
+              title: normalizeSpace(raw.title),
+              orderNo: raw.orderNo || '',
+              smmId: raw.smmId || '',
+              dateTime: raw.dateTime || '',
+              status: normalizeStatus(raw.statusRaw || status || ''),
+              totalTl: Number(String(raw.totalTl || '0').replace(/\./g, '').replace(',', '.')) || 0,
+              username: raw.username || '',
+              error: raw.error || ''
+            };
+            const h = await hashRow(row);
+            if (state.hashes.has(h)) { state.dropped += 1; continue; }
+            state.hashes.add(h);
+            state.rows.push(row);
+            state.lastPageAdded += 1;
+            appendRow(row);
+          } catch (e) {
+            // [KANIT@KOD: HATA YAKALAMA/LOG] row parse -> continue
+            log('Hata', `Satır parse hatası (page=${page}): ${String(e?.message || e)}`);
+          }
+        }
+      } catch (e) {
+        // [KANIT@KOD: HATA YAKALAMA/LOG] page fetch/parse -> continue
+        log('Hata', `Sayfa hatası (page=${page}): ${String(e?.message || e)}`);
+      }
+
+      updateStats(`${status || 'genel'} p${page}/${maxPage}`);
         if (!ext.rows.length) {
           log('Hata', `[KANIT@KOD: HATA YAKALAMA/LOG] Sayfa ${p} veri alınamadı, sonraki sayfaya geçiliyor.`);
           continue;
@@ -191,7 +288,29 @@
 
   async function startScan({ status, maxPages }) {
     if (state.running) throw new Error('Tarama zaten çalışıyor.');
+
     state.stop = false;
+    state.running = true; // [KANIT@KOD: DURUM/STATE] running toggles
+    parseSpeed();
+    const maxPage = Number(maxPages);
+    if (!Number.isFinite(maxPage) || maxPage < 1) {
+      state.running = false;
+      throw new Error('Sayfa sayısı geçersiz.');
+    }
+
+    updateStats('başlatıldı');
+
+    try {
+      const tabId = await getActiveTabId();
+      const statuses = status === 'all' ? STATUSES : [status];
+      for (const st of statuses) {
+        if (state.stop) break;
+        await scanStatus(tabId, st, maxPage);
+      }
+      updateStats(state.stop ? 'durduruldu' : 'tamamlandı');
+      toast(state.stop ? 'Sipariş taraması durduruldu.' : 'Sipariş taraması tamamlandı.');
+    } finally {
+      state.running = false;
     state.running = true;
     getSpeedFactor();
     updateStats('başlatıldı');
@@ -202,10 +321,12 @@
       if (state.stop) break;
       await scanStatus(tabId, st, maxPages || 1);
     }
+  }
 
-    state.running = false;
-    updateStats(state.stop ? 'durduruldu' : 'tamamlandı');
-    toast(state.stop ? 'Sipariş taraması durduruldu.' : 'Sipariş taraması tamamlandı.');
+  function stopScan() {
+    state.stop = true; // [KANIT@KOD: HATA YAKALAMA/LOG] stop mid-loop
+    log('Bilgi', 'Kullanıcı durdurma sinyali verdi.');
+    updateStats('durduruluyor');
   }
 
   function stopScan() { state.stop = true; }
@@ -214,22 +335,29 @@
     state.rows = [];
     state.hashes.clear();
     state.dropped = 0;
-    ui.tbody.innerHTML = '';
+    state.lastPageAdded = 0;
+    if (ui.tbody) ui.tbody.innerHTML = '';
     updateStats('temizlendi');
   }
 
   async function copyTableMarkdown() {
     const head = '| İlan Başlığı | Sipariş No | SMM ID | Tarih | Durum | Tutar (TL) | Kullanıcı |\n|---|---|---|---|---|---:|---|';
     const body = state.rows.map((r) => `| ${r.title} | ${r.orderNo} | ${r.smmId} | ${r.dateTime} | ${r.status} | ${r.totalTl} | ${r.username} |`).join('\n');
-    try { await navigator.clipboard.writeText(`${head}\n${body}`); toast('Sipariş tablosu MD olarak kopyalandı.'); }
-    catch { toast('Panoya kopyalama başarısız.'); }
+    try {
+      await navigator.clipboard.writeText(`${head}\n${body}`);
+      toast('Sipariş tablosu MD olarak kopyalandı.');
+    } catch {
+      toast('Panoya kopyalama başarısız.');
+    }
   }
 
   function download(name, text, mime) {
     const blob = new Blob([text], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = name; a.click();
+    a.href = url;
+    a.download = name;
+    a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
@@ -242,6 +370,14 @@
     download(`siparis_${Date.now()}.csv`, '\ufeff' + lines.join('\n'), 'text/csv;charset=utf-8');
   }
 
+  function bindOnce(element, event, key, fn) {
+    if (!element) return;
+    const bindKey = `${key}:${event}`;
+    if (BOUND_EVENTS.has(bindKey)) return;
+    BOUND_EVENTS.add(bindKey);
+    element.addEventListener(event, fn);
+  }
+
   function bind() {
     ui.selStatus = byId('selSiparisStatus');
     ui.inpMaxPage = byId('inpSiparisMaxPage');
@@ -250,6 +386,23 @@
     ui.stats = byId('siparisStats');
     ui.empty = byId('ordersEmpty');
 
+    if (ui.inpSpeed && !ui.inpSpeed.value) ui.inpSpeed.value = '3';
+
+    bindOnce(ui.inpSpeed, 'change', 'inpScanSpeed', () => {
+      try {
+        parseSpeed();
+        updateStats('hız güncellendi');
+      } catch (e) {
+        toast(String(e?.message || e));
+        if (ui.inpSpeed) ui.inpSpeed.value = '3';
+        state.speed = 3;
+      }
+    });
+
+    bindOnce(byId('btnSiparisStart'), 'click', 'btnSiparisStart', async () => {
+      try {
+        const status = ui.selStatus?.value || 'all';
+        const maxPages = parseMaxPage();
     if (ui.inpSpeed) {
       ui.inpSpeed.value = String(state.speed);
       ui.inpSpeed.addEventListener('change', () => {
@@ -274,6 +427,15 @@
         toast(`Sipariş tarama hatası: ${String(e?.message || e)}`);
       }
     });
+
+    bindOnce(byId('btnSiparisStop'), 'click', 'btnSiparisStop', () => stopScan());
+    bindOnce(byId('btnSiparisClear'), 'click', 'btnSiparisClear', () => clearTable());
+    bindOnce(byId('btnSiparisCopyMd'), 'click', 'btnSiparisCopyMd', () => copyTableMarkdown());
+    bindOnce(byId('btnSiparisExportJson'), 'click', 'btnSiparisExportJson', () => exportJson());
+    bindOnce(byId('btnSiparisExportCsv'), 'click', 'btnSiparisExportCsv', () => exportCsv());
+
+    updateStats();
+  }
     byId('btnSiparisStop')?.addEventListener('click', () => stopScan());
     byId('btnSiparisClear')?.addEventListener('click', () => clearTable());
     byId('btnSiparisCopyMd')?.addEventListener('click', () => copyTableMarkdown());
@@ -284,7 +446,11 @@
 
   const Siparis = { init: bind, startScan, stopScan, clearTable, copyTableMarkdown, exportJson, exportCsv };
 
+  const Siparis = { init: bind, startScan, stopScan, clearTable, copyTableMarkdown, exportJson, exportCsv, buildPageUrl, speedDelayMs, hashRow };
   window.Patpat = window.Patpat || {};
   window.Patpat.Siparis = Siparis;
-  Siparis.init();
+
+  if (document.body?.dataset?.page === 'sidepanel' || byId('btnSiparisStart')) {
+    Siparis.init();
+  }
 })();
