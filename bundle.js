@@ -1917,6 +1917,10 @@ function bindEvents() {
   // Bölüm 7: Başlatma (ilk yükleme, ayarları geri çağırma)
   // ───────────────────────────────────────────────────────────────
   async function boot() {
+    if (window.__patpatFooterReady && typeof window.__patpatFooterReady.then === 'function') {
+      try { await window.__patpatFooterReady; } catch (_) {}
+    }
+
     UI.init();
     bindEvents();
 
