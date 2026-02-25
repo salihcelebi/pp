@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Şikayet Yönetimi</title>
+  <style>
+    body{font-family:Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:20px}
+    .wrap{max-width:1300px;margin:0 auto}
+    .card{background:#111827;border:1px solid #334155;border-radius:12px;padding:14px;margin-bottom:12px}
+    .controlbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    input,select,button,textarea{height:36px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#e2e8f0;padding:0 10px}
+    textarea{height:auto;min-height:110px;padding:8px}
+    .grid{display:grid;grid-template-columns:1fr 1.3fr;gap:10px}
+    .list{max-height:360px;overflow:auto;border:1px solid #334155;border-radius:10px;padding:8px}
+    .item{padding:8px;border:1px solid #334155;border-radius:8px;margin-bottom:6px;cursor:pointer}
+    .item.active{border-color:#60a5fa;background:#0b1220}
+    .detail{border:1px solid #334155;border-radius:10px;padding:10px;min-height:240px}
+    .muted{color:#94a3b8;font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="wrap" id="complaintsAdvancedPanel">
+    <div class="card">
+      <h2>Şikayet Kutusu</h2>
+      <div class="controlbar">
+        <input id="inpComplaintDate" type="text" placeholder="25.02.2026" />
+        <input id="inpComplaintSearch" type="text" placeholder="Ara: SMM ID / sipariş / durum" />
+        <button id="btnComplaintScan" type="button">Taramayı Başlat</button>
+        <button id="btnComplaintStop" type="button">Durdur</button>
+        <button id="btnComplaintDraft" type="button">Taslak</button>
+        <button id="btnComplaintSolution" type="button">Çözüm</button>
+        <button id="btnComplaintEscalate" type="button">Eskale</button>
+        <button id="btnComplaintClose" type="button">Kapat</button>
+      </div>
+      <p id="complaintStats" class="muted">Kayıt: 0 • Durum: hazır</p>
+      <textarea id="complaintDraftText" placeholder="Taslak mesaj burada oluşur"></textarea>
+    </div>
+
+    <div class="card">
+      <h2>Liste + Detay</h2>
+      <div class="grid">
+        <div>
+          <div id="complaintsList" class="list"></div>
+          <p id="complaintEmpty" class="muted">İşlenecek şikayet bulunamadı.</p>
+        </div>
+        <div>
+          <div id="complaintDetail" class="detail">Detay görmek için listeden bir şikayet seçin.</div>
+          <div class="controlbar" style="margin-top:8px">
+            <select id="selComplaintStatus">
+              <option value="SORUN BİLDİRİLDİ">SORUN BİLDİRİLDİ</option>
+              <option value="BEKLEMEDE">BEKLEMEDE</option>
+              <option value="ESKALE">ESKALE</option>
+              <option value="KAPALI">KAPALI</option>
+            </select>
+            <button id="btnComplaintSaveStatus" type="button">Durumu Kaydet</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="sikayet.js"></script>
+</body>
+</html>
