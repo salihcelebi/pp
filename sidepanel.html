@@ -584,6 +584,15 @@
       .tabbar{flex-wrap:wrap}
       .tab{flex: 1 1 30%}
     }
+
+    /* Gelişmiş şikayet tam ekran */
+    .complaints-advanced table th, .complaints-advanced table td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.08);font-size:12px;text-align:left}
+    body.complaint-only-fullscreen .topbar,
+    body.complaint-only-fullscreen .tabbar,
+    body.complaint-only-fullscreen .mainheader,
+    body.complaint-only-fullscreen .tabpanel:not([data-tabpanel="complaints"]){display:none !important}
+    body.complaint-only-fullscreen .layout{grid-template-columns:1fr}
+    body.complaint-only-fullscreen .right{display:none}
   </style>
 </head>
 
@@ -690,6 +699,9 @@
                   <option value="returnprocess">returnprocess</option>
                 </select>
                 <input id="inpSiparisMaxPage" type="number" min="1" max="50" value="5" placeholder="Max sayfa" />
+                <label class="small" style="display:flex;align-items:center;gap:6px;">Tarama Hızı (x)
+                  <input id="inpScanSpeed" type="number" min="1" max="100" value="3" style="width:82px;" />
+                </label>
                 <button class="btn primary" id="btnSiparisStart" type="button">Taramayı Başlat</button>
                 <button class="btn" id="btnSiparisStop" type="button">Durdur</button>
                 <button class="btn" id="btnSiparisClear" type="button">Temizle</button>
@@ -902,52 +914,47 @@
 
         <!-- Sekme: Şikayet -->
         <section class="tabpanel" data-tabpanel="complaints" hidden>
-          <div class="cards">
+          <div class="cards complaints-advanced" id="complaintsAdvancedPanel">
             <div class="card">
-              <h3>Müşteri Şikayet Yönetimi</h3>
-              <p>Akış: <b>Kanıtla → Açıkla → Kapat</b>. Sadece gerçek sayfadan DOM/regex ile kayıt üretir.</p>
+              <h3>MÜŞTERİ ŞİKAYET YÖNETİMİ (GELİŞMİŞ TARAMA)</h3>
+              <p>https://hesap.com.tr/p/sattigim-ilanlar?page=N akışı ile tüm sayfaları sıra bozmadan tarar.</p>
               <div class="row">
-                <input id="inpComplaintPages" type="number" min="1" max="50" value="5" placeholder="Sayfa sayısı" />
-                <label class="small" style="display:flex;align-items:center;gap:6px;">
-                  Hız
-                  <input id="rngComplaintSpeed" type="range" min="1" max="10" value="5" />
+                <label class="small" style="display:flex;align-items:center;gap:6px;">Tarih
+                  <input id="inpComplaintDate" type="text" placeholder="25.02.2026" style="width:120px;" />
                 </label>
                 <button class="btn primary" id="btnComplaintScan" type="button">Şikayet Tara</button>
                 <button class="btn" id="btnComplaintStop" type="button">Durdur</button>
+                <button class="btn" id="btnComplaintFullscreen" type="button">MÜŞTERİ ŞİKAYET YÖNETİMİ (GELİŞMİŞ TARAMA)</button>
+                <button class="btn" id="btnComplaintOnlyFullscreen" type="button">SADECE TAM EKRAN</button>
               </div>
-              <div class="row">
-                <button class="btn primary" id="btnComplaintDraft" type="button">Yanıt Taslağı</button>
-                <button class="btn" id="btnComplaintSolution" type="button">Çözüm Öner</button>
-                <button class="btn" id="btnComplaintEscalate" type="button">Yöneticiye Eskale</button>
-                <button class="btn danger" id="btnComplaintClose" type="button">Şikayeti Kapat</button>
+              <div class="row" style="gap:14px;flex-wrap:wrap;">
+                <span class="pill"><b>SMM ID</b></span>
+                <span class="pill"><b>SİPARİŞ NO</b></span>
+                <span class="pill"><b>KALAN SAAT</b></span>
+                <span class="pill"><b>KALAN DK</b></span>
               </div>
-              <div class="row">
-                <input id="inpComplaintSearch" type="text" placeholder="Ara: SMM ID, kullanıcı, durum" />
-              </div>
-              <div class="hint" id="complaintStats">Kayıt: 0 • SLA Risk: 0</div>
+              <div class="hint" id="complaintStats">Kayıt: 0 • Durum: hazır</div>
             </div>
 
             <div class="card">
-              <h3>3 Panel</h3>
-              <div style="display:grid;grid-template-columns:1.1fr 1.2fr 1fr;gap:10px;">
-                <div>
-                  <div class="hint">Liste (SMM ID, müşteri, durum, SLA)</div>
-                  <div id="complaintsList" class="filelist" style="max-height:380px;overflow:auto;"></div>
-                </div>
-                <div>
-                  <div class="hint">Detay + Kanıt</div>
-                  <div id="complaintDetail" style="min-height:240px;"></div>
-                </div>
-                <div>
-                  <div class="hint">Eylem</div>
-                  <textarea id="complaintDraftText" class="code" style="min-height:220px;" placeholder="Yanıt taslağı burada oluşur."></textarea>
-                  <div class="row" style="margin-top:8px;">
-                    <button class="btn" id="btnComplaintCopyDraft" type="button">Taslağı Kopyala</button>
-                    <button class="btn" id="btnComplaintOpenMessage" type="button">Mesaj Sayfasına Git</button>
-                  </div>
-                  <div class="hint" id="complaintActionHint">Servis ID gizleme kontrolü: bekleniyor.</div>
-                </div>
+              <h3>Şikayet Sonuç Tablosu</h3>
+              <div style="overflow:auto; border:1px solid rgba(255,255,255,.12); border-radius:14px;">
+                <table style="width:100%; border-collapse:collapse; min-width:1100px;">
+                  <thead>
+                    <tr>
+                      <th>HİZMET</th>
+                      <th>SİPARİŞ</th>
+                      <th>SMM ID</th>
+                      <th>TARİH</th>
+                      <th>DURUM</th>
+                      <th>KALAN SÜRE</th>
+                      <th>TUTAR</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tblComplaintBody"></tbody>
+                </table>
               </div>
+              <div class="empty" id="complaintEmpty">Henüz şikayet verisi yok.</div>
             </div>
           </div>
         </section>
