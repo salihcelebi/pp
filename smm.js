@@ -1,337 +1,170 @@
 (() => {
   if (typeof window === 'undefined') return;
-  if (window.__SMM_INIT__) return; // [KANIT@KOD: DURUM/STATE] __SMM_INIT__ gate
+  if (window.__SMM_INIT__) return;
   window.__SMM_INIT__ = true;
   'use strict';
 
-  // [KANIT@KOD: DIŞ BAĞIMLILIK] BASE_URL
   const BASE_URL = 'https://anabayiniz.com/orders';
-  const STATUSES = ['pending', 'completed', 'inprogress', 'canceled'];
-  const BOUND_EVENTS = new Set();
+  const SOLD_BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar';
+  const BOUND = new Set();
 
-  const state = {
-    rows: [],
-    hashes: new Set(),
-    dropped: 0,
-    stop: false,
-    running: false
-  };
+  const RX_TITLE_15 = [/^([^\n]{10,200})\n(?=[\s\S]*?\bSipariş\s*#\d+)/mi,/^([^\n]{10,200})\n[^\n]{0,200}\n\s*Sipariş\s*#\d+/mi,/(?:^|\n)([^\n]{10,200})\n(?:\1|\s*[^\n]{10,200})\n\s*Sipariş\s*#\d+/mi,/([^\n]{10,200})\s*\n\s*Sipariş\s*#\d+/mi,/([^\n]{10,200})\s*(?=\s*\n\s*\n\s*Sipariş\s*#\d+)/mi,/([^\n]{10,200})\s*\n\s*\n\s*Sipariş\s*#\d+/mi,/([A-ZÇĞİÖŞÜ0-9][^\n]{8,200})\n(?=Sipariş\s*#\d+)/m,/(?:YOUTUBE|TİKTOK|TikTok|Instagram|INSTAGRAM)\b[^\n]{5,200}/m,/^(.*(?:Beğeni|Takipçi|İzlenme|Yorum|Kaydet)[^\n]{0,160})$/mi,/^(.{10,200})$/m,/([^\n]{10,200})(?=\nSMM\s*ID:)/mi,/([^\n]{10,200})(?=\n\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})/mi,/([^\n]{10,200})(?=\n(?:Teslim|İptal|Müşteri|Sorun))/mi,/([^\n]{10,200})(?=\nToplam\s*Tutar)/mi,/([^\n]{10,200})(?=\n[\s\S]*?TL)/mi];
+  const RX_ORDER_15 = [/\bSipariş\s*#(\d{5,12})\b/i,/\bSİPARİŞ\s*#(\d{5,12})\b/i,/#\s*(\d{5,12})\b/i,/\bSiparis\s*#(\d{5,12})\b/i,/\bSipariş\s*No[:\s]*#?(\d{5,12})\b/i,/\bSipariş[:\s]*#?(\d{5,12})\b/i,/\bOrder\s*#(\d{5,12})\b/i,/\bSipariş\s*ID[:\s]*#?(\d{5,12})\b/i,/\bSipariş\s*Numarası[:\s]*#?(\d{5,12})\b/i,/\bSipariş\s*-\s*#?(\d{5,12})\b/i,/\bSIPARIS\s*#(\d{5,12})\b/i,/\bSIPARIS[:\s]*#?(\d{5,12})\b/i,/\bSipariş\s*\n\s*#(\d{5,12})\b/i,/(?:^|\n)\s*Sipariş\s*#(\d{5,12})/i,/\b(\d{5,12})\b(?=[\s\S]*?SMM\s*ID:|\s*\n\s*\d{2}\.\d{2}\.\d{4})/i];
+  const RX_SMM_15 = [/\bSMM\s*ID:\s*(\d{4,12})\b/i,/\bSMMID:\s*(\d{4,12})\b/i,/\bSMM\s*No[:\s]*(\d{4,12})\b/i,/\bSMM\s*#\s*(\d{4,12})\b/i,/\bID:\s*(\d{4,12})\b(?=[\s\S]*?\d{2}\.\d{2}\.\d{4})/i,/\bSMM\s*Kimlik[:\s]*(\d{4,12})\b/i,/\bSMM\s*Numara[:\s]*(\d{4,12})\b/i,/\bSMM\s*[:\s]*(\d{4,12})\b/i,/(?:^|\n)\s*(\d{4,12})\s*(?=\n\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})/m,/(?:^|\n)\s*SMM\s*\n\s*ID[:\s]*(\d{4,12})/mi,/\bSMM\s*I[D|d]\s*[:\-]\s*(\d{4,12})\b/i,/\bSMM\s*Id\s*[:\-]\s*(\d{4,12})\b/i,/\bSMM\s*IDENTIFIER[:\s]*(\d{4,12})\b/i,/\bSMM\s*CODE[:\s]*(\d{4,12})\b/i,/\b(\d{4,12})\b(?=[\s\S]*?Toplam\s*Tutar)/i];
+  const RX_DATE_15 = [/\b(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})\b/,/\b(\d{1,2}\.\d{1,2}\.\d{4}\s+\d{2}:\d{2})\b/,/\b(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})\b/,/\b(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\b/,/\b(\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2})\b/,/(?:^|\n)\s*(\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2})/m,/\b(\d{2}\.\d{2}\.\d{4})\b(?=[\s\S]*?\bTeslim|\bİptal|\bMüşteri|\bSorun)/i,/\b(\d{2}:\d{2})\b(?=[\s\S]*?Toplam\s*Tutar)/i,/\b(\d{2}\.\d{2}\.\d{4}\s+\d{1,2}:\d{2})\b/,/\b(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{1,2})\b/,/(?:^|\n)\s*(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})\s*$/m,/(?:^|\n)\s*(\d{2}\.\d{2}\.\d{4})\s*$/m,/\b(\d{2}\.\d{2}\.\d{4})\b/,/\b(\d{2}\/\d{2}\/\d{4})\b/,/\b(\d{4}-\d{2}-\d{2})\b/];
+  const RX_STATUS_15 = [/\bTeslim\s*Edildi\b/i,/\bİptal\s*Edildi\b/i,/\bMüşteriden\s*Onay\s*Bekleniyor\b/i,/\bSorun\s*Bildirildi\b/i,/\bIade\s*Sürecinde\b/i,/\bTeslimat\s*Bekleniyor\b/i,/\bİşlem\s*Sırasında\b/i,/\bBeklemede\b/i,/\bTamamlandı\b/i,/\bBaşarısız\b/i,/\bKısmi\s*Tamamlandı\b/i,/\bGeri\s*Ödeme\b/i,/\bOnay\s*Bekliyor\b/i,/(?:^|\n)([^\n]{3,60})(?=\nToplam\s*Tutar)/mi,/(?:^|\n)\d{2}:\d{2}\n([^\n]{3,60})/mi];
+  const RX_AMOUNT_15 = [/\bToplam\s*Tutar\s*\n\s*([\d.,]+\s*TL)\b/i,/\bToplam\s*Tutar\s*([\d.,]+\s*TL)\b/i,/\bTutar\s*\n\s*([\d.,]+\s*TL)\b/i,/\bTutar[:\s]*([\d.,]+\s*TL)\b/i,/\bToplam[:\s]*([\d.,]+\s*TL)\b/i,/\bTotal\s*Amount[:\s]*([\d.,]+\s*TL)\b/i,/\bToplam\s*Ücret[:\s]*([\d.,]+\s*TL)\b/i,/\bÜcret[:\s]*([\d.,]+\s*TL)\b/i,/(?:^|\n)\s*([\d]{1,3}(?:\.[\d]{3})*(?:,[\d]{2})?)\s*TL\b/m,/\b([\d]{1,3}(?:\.[\d]{3})*(?:,[\d]{2})?)\s*TL\b/,/\b([\d]+(?:,[\d]{2})?)\s*TL\b/,/\b([\d]+(?:\.[\d]{3})*(?:,[\d]{2})?)\s*TL\b/,/TL\s*([\d.,]+)/i,/([\d.,]+)\s*(?:₺|TL)\b/i,/(?:Toplam\s*Tutar[\s\S]{0,40})\b([\d.,]+\s*(?:₺|TL))\b/i];
 
+  const RX_SMM_PLATFORM_15 = [/\bTik\s*Tok\b/i,/\bTİKTOK\b/i,/\btiktok\b/i,/\bInstagram\b/i,/\bINSTAGRAM\b/i,/\binstagram\b/i,/\bYou\s*Tube\b/i,/\bYouTube\b/i,/\bYOUTUBE\b/i,/\bTwitter\b/i,/\bX\s*\(Twitter\)\b|\bTwitter\s*\(X\)\b/i,/\bFacebook\b/i,/\bTelegram\b/i,/\bTwitch\b/i,/\bSpotify\b/i];
+  const RX_SMM_SERVICE_NAME_15 = [/^(?:Hizmet|Servis)\s*Ad[ıi]\s*[:\-]\s*([^\n]{5,200})/mi,/^(?:Service)\s*Name\s*[:\-]\s*([^\n]{5,200})/mi,/^([^\n]{10,220})\n(?=[\s\S]*?(?:\bMin\b|\bMax\b|\bFiyat\b|\bTL\b|₺))/m,/^([^\n]{10,220})\n[^\n]{0,220}\n(?=[\s\S]*?(?:TL|₺))/m,/(?:^|\n)([^\n]{10,220})(?=\n(?:Min|MAX|Max|Fiyat|Ücret|Price)\b)/mi,/(?:^|\n)([^\n]{10,220})(?=\n(?:\d{1,3}(?:\.\d{3})*(?:,\d{2})?\s*(?:TL|₺)))/m,/(?:^|\n)([^\n]{10,220})(?=[\s\S]*?\b(?:Takipçi|Beğeni|İzlenme|Yorum|Kaydet|Abone)\b)/mi,/(?:^|\n)([^\n]{10,220})(?=[\s\S]*?\b(?:Garantili|Telafi|Keşfet|Algoritma)\b)/mi,/(?:^|\n)•\s*([^\n]{10,220})/m,/(?:^|\n)-\s*([^\n]{10,220})/m,/(?:^|\n)\*\s*([^\n]{10,220})/m,/(?:^|\n)\d+\)\s*([^\n]{10,220})/m,/(?:^|\n)([A-ZÇĞİÖŞÜ0-9][^\n]{9,220})/m,/"serviceName"\s*:\s*"([^"]{5,220})"/i,/"name"\s*:\s*"([^"]{5,220})"/i];
+  const RX_SMM_SERVICE_ID_15 = [/\bServis\s*ID[:\s]*#?(\d{2,12})\b/i,/\bHizmet\s*ID[:\s]*#?(\d{2,12})\b/i,/\bService\s*ID[:\s]*#?(\d{2,12})\b/i,/\bID[:\s]*#?(\d{2,12})\b(?=[\s\S]*?(?:TL|₺|Fiyat|Price))/i,/\bKod[:\s]*#?(\d{2,12})\b/i,/\bNo[:\s]*#?(\d{2,12})\b(?=[\s\S]*?(?:Min|Max|Fiyat|TL|₺))/i,/(?:^|\n)\s*#\s*(\d{2,12})\b/m,/(?:^|\n)\s*\[(\d{2,12})\]\s*/m,/(?:^|\n)\s*\((\d{2,12})\)\s*/m,/"serviceId"\s*:\s*"?(\d{2,12})"?/i,/"id"\s*:\s*"?(\d{2,12})"?/i,/data-service-id\s*=\s*"(\d{2,12})"/i,/\bSERVISID[:\s]*(\d{2,12})\b/i,/\bHIZMETID[:\s]*(\d{2,12})\b/i,/\b(\d{2,12})\b(?=[\s\S]*?(?:Min|Max|Fiyat|TL|₺))/i];
+  const RX_SMM_PRICE_15 = [/\bFiyat[:\s]*([\d]{1,3}(?:\.[\d]{3})*(?:,[\d]{2})?\s*(?:TL|₺))\b/i,/\bÜcret[:\s]*([\d]{1,3}(?:\.[\d]{3})*(?:,[\d]{2})?\s*(?:TL|₺))\b/i,/\bPrice[:\s]*([\d]{1,3}(?:\.[\d]{3})*(?:,[\d]{2})?\s*(?:TL|₺))\b/i,/\bBirim\s*Fiyat[:\s]*([\d.,]+\s*(?:TL|₺))\b/i,/\bToplam[:\s]*([\d.,]+\s*(?:TL|₺))\b/i,/(?:^|\n)\s*([\d]{1,3}(?:\.[\d]{3})*(?:,[\d]{2})?)\s*(?:TL|₺)\b/m,/\b([\d]{1,3}(?:\.[\d]{3})*(?:,[\d]{2})?)\s*(?:TL|₺)\b/,/\b([\d]+(?:,[\d]{2})?)\s*(?:TL|₺)\b/,/\b([\d]+(?:\.[\d]{3})*(?:,[\d]{2})?)\s*(?:TL|₺)\b/,/TL\s*([\d.,]+)/i,/₺\s*([\d.,]+)/i,/"price"\s*:\s*"([^"]+)"/i,/"amount"\s*:\s*"([^"]+)"/i,/\bFiyat\b[\s\S]{0,30}\b([\d.,]+\s*(?:TL|₺))\b/i,/\b([\d.,]+)\s*(?:TL|₺)\b/i];
+  const RX_SMM_MIN_15 = [/\bMin(?:imum)?[:\s]*(\d{1,12})\b/i,/\bMinimum\s*Sipariş[:\s]*(\d{1,12})\b/i,/\bMin\s*Order[:\s]*(\d{1,12})\b/i,/\bEn\s*Az[:\s]*(\d{1,12})\b/i,/\bMin[:\s]*([0-9]{1,12})\b/i,/(?:^|\n)\s*Min\s*\n\s*(\d{1,12})\b/mi,/\bAlt\s*Limit[:\s]*(\d{1,12})\b/i,/\bBaşlangıç[:\s]*(\d{1,12})\b/i,/"min"\s*:\s*"?(\d{1,12})"?/i,/"minimum"\s*:\s*"?(\d{1,12})"?/i,/data-min\s*=\s*"(\d{1,12})"/i,/\b(\d{1,12})\b(?=[\s\S]*?\bMax\b)/i,/\bMin\b[\s\S]{0,10}\b(\d{1,12})\b/i,/\bMinimum\b[\s\S]{0,10}\b(\d{1,12})\b/i,/\bEn\s*Az\b[\s\S]{0,10}\b(\d{1,12})\b/i];
+  const RX_SMM_MAX_15 = [/\bMax(?:imum)?[:\s]*(\d{1,12})\b/i,/\bMaks(?:imum)?[:\s]*(\d{1,12})\b/i,/\bMaximum\s*Sipariş[:\s]*(\d{1,12})\b/i,/\bMax\s*Order[:\s]*(\d{1,12})\b/i,/\bEn\s*Fazla[:\s]*(\d{1,12})\b/i,/(?:^|\n)\s*Max\s*\n\s*(\d{1,12})\b/mi,/\bÜst\s*Limit[:\s]*(\d{1,12})\b/i,/\bTavan[:\s]*(\d{1,12})\b/i,/"max"\s*:\s*"?(\d{1,12})"?/i,/"maximum"\s*:\s*"?(\d{1,12})"?/i,/data-max\s*=\s*"(\d{1,12})"/i,/\b(\d{1,12})\b(?=[\s\S]*?\bTL\b|₺)/i,/\bMax\b[\s\S]{0,10}\b(\d{1,12})\b/i,/\bMaks\b[\s\S]{0,10}\b(\d{1,12})\b/i,/\bEn\s*Fazla\b[\s\S]{0,10}\b(\d{1,12})\b/i];
+  const RX_SMM_DELIVERY_15 = [/\bTeslimat[:\s]*([^\n]{2,60})/i,/\bTeslim\s*Süresi[:\s]*([^\n]{2,60})/i,/\bDelivery[:\s]*([^\n]{2,60})/i,/\bSpeed[:\s]*([^\n]{2,60})/i,/\bHız[:\s]*([^\n]{2,60})/i,/\bOrtalama[:\s]*([^\n]{2,60})/i,/\b(\d{1,3}\s*(?:dk|dakika))\b/i,/\b(\d{1,2}\s*(?:sa|saat))\b/i,/\b(\d{1,2}\s*(?:gün))\b/i,/\bAnında\b/i,/\bHemen\b/i,/\b24\/7\b/i,/\b(\d{1,2}\-\d{1,2}\s*(?:sa|saat))\b/i,/\b(\d{1,2}\-\d{1,2}\s*(?:gün))\b/i,/"delivery"\s*:\s*"([^"]{2,60})"/i];
+  const RX_SMM_CATEGORY_15 = [/\bKategori[:\s]*([^\n]{3,80})/i,/\bCategory[:\s]*([^\n]{3,80})/i,/\bTür[:\s]*([^\n]{3,80})/i,/\bType[:\s]*([^\n]{3,80})/i,/\bGrup[:\s]*([^\n]{3,80})/i,/\bGroup[:\s]*([^\n]{3,80})/i,/(?:^|\n)\s*Kategori\s*\n\s*([^\n]{3,80})/mi,/\bSosyal\s*Medya\b/i,/\bBeğeni\b/i,/\bTakipçi\b/i,/\bİzlenme\b/i,/\bYorum\b/i,/\bKaydet\b/i,/\bAbone\b/i,/"category"\s*:\s*"([^"]{3,80})"/i];
+
+  const state = { rows: [], hashes: new Set(), dropped: 0, running: false, stop: false };
   const ui = {};
-
   const byId = (id) => document.getElementById(id);
   const toast = (m) => window.__PatpatUI?.UI?.toast?.(m) || alert(m);
   const log = (level, msg) => window.__PatpatUI?.UI?.log?.(level, msg) || console[level === 'Hata' ? 'error' : 'log'](msg);
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  function normalizeSpace(v) { return String(v || '').replace(/\s+/g, ' ').trim(); }
+  function bindOnce(el, ev, key, fn){ if(!el) return; const k=`${key}:${ev}`; if(BOUND.has(k)) return; BOUND.add(k); el.addEventListener(ev, fn); }
+  function pickFirstMatch(list, text, groupIndex = 1){ for(const rx of list){ const m = String(text||'').match(rx); if(m) return (m[groupIndex] || m[0] || '').trim(); } return ''; }
+  function buildPageUrl(baseUrl, page){ return `${baseUrl}?page=${page}`; }
 
-  // [KANIT@KOD: DÖNÜŞÜM] buildPageUrl
-  function buildPageUrl(baseUrl, page) {
-    return `${String(baseUrl || '').replace(/\?page=\d+$/i, '')}?page=${page}`;
+  function splitBlocks(pageText){ return String(pageText||'').split(/(?=Sipariş\s*#\d+)/i).map((x)=>x.trim()).filter(Boolean); }
+  function splitServiceBlocks(pageText){
+    const text = String(pageText || '');
+    const fromRows = text.split(/\n{2,}/).map((x) => x.trim()).filter((x) => x.split('\n').length >= 2);
+    return fromRows.length ? fromRows : text.split(/(?=\b(?:Hizmet|Servis|Service)\b|\bMin\b|\bFiyat\b)/i).map((x)=>x.trim()).filter(Boolean);
   }
 
-  // [KANIT@KOD: KOŞUL/FİLTRE] 1<=speed<=100 && isFinite
-  function parseSpeedInput() {
-    const raw = Number(ui.speed?.value ?? 3);
-    if (!Number.isFinite(raw) || raw < 1 || raw > 100) {
-      throw new Error('Tarama hızı 1-100 arasında sayı olmalıdır.');
-    }
-    return raw;
+  function detectMode(url){ return String(url||'').includes('/p/sattigim-ilanlar') ? 'sold' : 'services'; }
+
+  function normalizeServiceName(name, block){
+    const lines = String(block||'').split('\n').map((x)=>x.trim()).filter(Boolean);
+    if (lines[0] && lines[1] && lines[0] === lines[1]) return lines[0];
+    return String(name||'').replace(/\s+/g, ' ').trim();
   }
 
-  // [KANIT@KOD: DÖNÜŞÜM] speed->delay
-  function speedDelayMs(speed) {
-    const s = Math.max(1, Math.min(100, Number(speed || 3)));
-    return Math.max(40, Math.round(1800 / s));
+  function parseServiceBlock(blockText){
+    const name = normalizeServiceName(pickFirstMatch(RX_SMM_SERVICE_NAME_15, blockText), blockText);
+    let platform = pickFirstMatch(RX_SMM_PLATFORM_15, blockText);
+    if (!platform) platform = pickFirstMatch(RX_SMM_PLATFORM_15, name);
+    const serviceId = pickFirstMatch(RX_SMM_SERVICE_ID_15, blockText);
+    const price = pickFirstMatch(RX_SMM_PRICE_15, blockText);
+    const min = pickFirstMatch(RX_SMM_MIN_15, blockText);
+    const max = pickFirstMatch(RX_SMM_MAX_15, blockText);
+    const delivery = pickFirstMatch(RX_SMM_DELIVERY_15, blockText);
+    const category = pickFirstMatch(RX_SMM_CATEGORY_15, blockText);
+    return { platform, name, serviceId, price, min, max, delivery, category, mode: 'services' };
   }
 
-  function updateStats(mode = 'beklemede') {
-    if (ui.stats) {
-      ui.stats.textContent = `Kayıt: ${state.rows.length} • Dedup: ${state.dropped} • Durum: ${mode}`;
-    }
-    if (ui.empty) ui.empty.hidden = state.rows.length > 0;
+  function parseSoldBlock_SMM(blockText){
+    const title = pickFirstMatch(RX_TITLE_15, blockText);
+    const orderNo = pickFirstMatch(RX_ORDER_15, blockText);
+    const smmId = pickFirstMatch(RX_SMM_15, blockText);
+    const dateTime = pickFirstMatch(RX_DATE_15, blockText);
+    const status = pickFirstMatch(RX_STATUS_15, blockText);
+    const amount = pickFirstMatch(RX_AMOUNT_15, blockText);
+    return { title, orderNo, smmId, dateTime, status, amount, mode: 'sold' };
   }
 
-  async function hashRow(r) {
-    const src = `${r.orderId}|${r.dateTime}|${r.orderUrl}|${r.unitPrice}|${r.service}|${r.status}|${r.remains}`;
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(src));
-    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  async function hashRow(src){
+    const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(src));
+    return Array.from(new Uint8Array(d)).map((b)=>b.toString(16).padStart(2,'0')).join('');
   }
 
-  function appendRow(row) {
-    if (!ui.tbody) return;
+  function appendRow(row){
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${row.orderId}</td><td>${row.dateTime}</td><td>${row.orderUrl}</td><td>${row.unitPrice}</td><td>${row.service}</td><td>${row.status}</td><td>${row.remains}</td>`;
-    ui.tbody.appendChild(tr);
-    updateStats(state.running ? 'taranıyor' : 'hazır');
+    if (row.mode === 'services') {
+      tr.innerHTML = `<td>${row.serviceId || ''}</td><td>${row.category || ''}</td><td>${row.name || ''}</td><td>${row.price || ''}</td><td>${row.platform || ''}</td><td>${row.delivery || ''}</td><td>${row.min || ''}-${row.max || ''}</td>`;
+    } else {
+      tr.innerHTML = `<td>${row.orderNo || ''}</td><td>${row.dateTime || ''}</td><td>${SOLD_BASE_URL}</td><td>${row.amount || ''}</td><td>${row.title || ''}</td><td>${row.status || ''}</td><td>${row.smmId || ''}</td>`;
+    }
+    ui.tbody?.appendChild(tr);
   }
 
-  // [KANIT@KOD: KOŞUL/FİLTRE] listener not duplicated
-  function bindOnce(element, eventName, key, handler) {
-    if (!element) return;
-    const guardKey = `${key}:${eventName}`;
-    if (BOUND_EVENTS.has(guardKey)) return;
-    BOUND_EVENTS.add(guardKey);
-    element.addEventListener(eventName, handler);
-  }
+  function updateStats(mode='beklemede'){ if(ui.stats) ui.stats.textContent=`Kayıt: ${state.rows.length} • Dedup: ${state.dropped} • Durum: ${mode}`; if(ui.empty) ui.empty.hidden=state.rows.length>0; }
+  async function getActiveTabId(){ const [tab]=await chrome.tabs.query({active:true,lastFocusedWindow:true}); if(!tab?.id) throw new Error('Aktif sekme yok'); return tab.id; }
+  async function navigate(tabId,url){ await chrome.tabs.update(tabId,{url}); await new Promise((res)=>{ const l=(id,info)=>{ if(id===tabId&&info.status==='complete'){ chrome.tabs.onUpdated.removeListener(l); res(true);} }; chrome.tabs.onUpdated.addListener(l);}); await wait(220); }
 
-  // [KANIT@KOD: UI] container reset
-  function renderSmmPanel() {
-    const container = byId('smmPanel');
-    if (!container) return;
-    container.innerHTML = '';
-    container.insertAdjacentHTML('beforeend', `
-      <div class="card">
-        <h3>SMM Yönetimi</h3>
-        <div class="row">
-          <select id="selSmmStatus">
-            <option value="all">Tüm Durumlar</option>
-            <option value="pending">pending</option>
-            <option value="completed">completed</option>
-            <option value="inprogress">inprogress</option>
-            <option value="canceled">canceled</option>
-          </select>
-          <input id="inpSmmMaxPage" type="number" min="1" max="50" value="5" />
-          <input id="inpScanSpeed" type="number" min="1" max="100" value="3" />
-          <button id="btnSmmStart" type="button">SMM Taramayı Başlat</button>
-          <button id="btnSmmStop" type="button">Durdur</button>
-          <button id="btnSmmClear" type="button">Temizle</button>
-        </div>
-        <div id="smmStats">Kayıt: 0 • Dedup: 0 • Durum: beklemede</div>
-      </div>
-      <div class="card" style="margin-top:10px;overflow:auto;">
-        <table style="width:100%;border-collapse:collapse;min-width:900px;">
-          <thead><tr><th>Sipariş ID</th><th>Tarih</th><th>Sipariş Link</th><th>Birim Fiyat</th><th>Servis</th><th>Durum</th><th>Kalan</th></tr></thead>
-          <tbody id="tblSmmBody"></tbody>
-        </table>
-        <div id="smmEmpty">Henüz SMM verisi yok.</div>
-      </div>
-    `);
-  }
-
-  async function getActiveTabId() {
-    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-    if (!tab?.id) throw new Error('Aktif sekme bulunamadı.');
-    return tab.id;
-  }
-
-  async function gotoAndWait(tabId, url, speed) {
-    await chrome.tabs.update(tabId, { url });
-    await new Promise((resolve) => {
-      const listener = (id, info) => {
-        if (id === tabId && info.status === 'complete') {
-          chrome.tabs.onUpdated.removeListener(listener);
-          resolve(true);
-        }
-      };
-      chrome.tabs.onUpdated.addListener(listener);
-    });
-    await wait(speedDelayMs(speed));
-  }
-
-  async function extractFromCurrentPage(tabId) {
+  async function extractContext(tabId){
     const [{ result }] = await chrome.scripting.executeScript({
       target: { tabId },
-      func: async () => {
-        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-        const step = Math.floor(window.innerHeight * 0.9);
-        for (let y = 0; y < document.body.scrollHeight; y += step) {
-          window.scrollTo({ top: y, behavior: 'auto' });
-          await sleep(120);
-        }
-
-        const clean = (v) => String(v || '').replace(/\s+/g, ' ').trim();
-        const rows = [];
-        const trList = Array.from(document.querySelectorAll('table tbody tr'));
-        for (const tr of trList) {
-          try {
-            const txt = clean(tr.innerText);
-            if (!txt) continue;
-            const orderId = (txt.match(/^([0-9]{7,12})$/m) || [, ''])[1];
-            const dateTime = (txt.match(/(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})/) || [, ''])[1];
-            const orderUrl = tr.querySelector('a[href]')?.href || (txt.match(/https?:\/\/[^\s\]]+/) || [, ''])[1] || '';
-            const unitPrice = Number((txt.match(/(\d+(?:\.\d+)?)/) || [, '0'])[1]);
-            const service = (txt.match(/(\d+\s*[—-]\s*.*)/) || [, ''])[1];
-            const status = (txt.match(/(Tamamlandı|İşlem Sırasında|Beklemede|İptal Edildi|Kısmi Tamamlandı|İade Edildi)/i) || [, ''])[1];
-            const remains = Number((txt.match(/\b(\d+)\b\s*$/) || [, '0'])[1]);
-            if (orderId || orderUrl) rows.push({ orderId, dateTime, orderUrl, unitPrice, service, status, remains, error: '' });
-          } catch (e) {
-            rows.push({ orderId: '', dateTime: '', orderUrl: '', unitPrice: 0, service: '', status: '', remains: 0, error: String(e?.message || e) });
-          }
-        }
-        return { rows };
+      func: () => {
+        const nodes = Array.from(document.querySelectorAll('article,.card,.list-group-item,tr,[class*="service"],[class*="order"]'));
+        const texts = nodes.map((n) => String(n.innerText || '').trim()).filter(Boolean);
+        return { href: location.href, domText: texts.join('\n\n'), bodyText: String(document.body.innerText || '') };
       }
     });
-    return result || { rows: [] };
+    return result || { href: '', domText: '', bodyText: '' };
   }
 
-  function passTimeFilter(dateTime) {
-    const mode = ui.timeFilter?.value || 'all';
-    if (mode === 'all') return true;
-    const d = new Date(String(dateTime || '').replace(' ', 'T'));
-    if (Number.isNaN(d.getTime())) return false;
-    const now = Date.now();
-    if (mode === '1d') return now - d.getTime() <= 24 * 3600 * 1000;
-    if (mode === '7d') return now - d.getTime() <= 7 * 24 * 3600 * 1000;
-    const x = Number(ui.xDays?.value || 30);
-    return now - d.getTime() <= x * 24 * 3600 * 1000;
-  }
-
-  async function scanStatus(tabId, status, userMaxPage, speed) {
-    const maxPage = Math.max(1, Number(userMaxPage || 1));
-
-    // [KANIT@KOD: DÖNGÜ/BİTİRME] for 1..N
-    for (let page = 1; page <= maxPage; page++) {
-      if (state.stop) return;
-      const statusBase = `${BASE_URL}/${status}`;
-      const pageUrl = buildPageUrl(statusBase, page);
-      updateStats(`${status} p${page}/${maxPage}`);
-
-      try {
-        await gotoAndWait(tabId, pageUrl, speed);
-        let ext = await extractFromCurrentPage(tabId);
-        if (!ext.rows.length) {
-          await chrome.tabs.reload(tabId);
-          await wait(speedDelayMs(speed));
-          ext = await extractFromCurrentPage(tabId);
-        }
-
-        for (const r of ext.rows) {
-          if (state.stop) return;
-          if (!passTimeFilter(r.dateTime)) continue;
-          const row = {
-            orderId: normalizeSpace(r.orderId),
-            dateTime: normalizeSpace(r.dateTime),
-            orderUrl: normalizeSpace(r.orderUrl),
-            unitPrice: Number(r.unitPrice || 0),
-            service: normalizeSpace(r.service),
-            status: normalizeSpace(r.status),
-            remains: Number(r.remains || 0),
-            error: r.error || ''
-          };
-          const hash = await hashRow(row);
-          if (state.hashes.has(hash)) { state.dropped += 1; continue; }
-          state.hashes.add(hash);
-          state.rows.push(row);
-          appendRow(row);
-        }
-      } catch (e) {
-        // [KANIT@KOD: HATA YAKALAMA/LOG] LOG+SAFE+continue
-        log('Hata', `SMM sayfa hatası status=${status} page=${page}: ${String(e?.message || e)}`);
-      }
-
-      updateStats(`${status} p${page}/${maxPage}`);
-      await wait(speedDelayMs(speed));
-    }
-  }
-
-  async function startScan({ status, maxPages }) {
-    if (state.running) throw new Error('SMM taraması zaten çalışıyor.');
-
-    const speed = parseSpeedInput();
-    state.stop = false;
+  async function startScan(){
+    if(state.running) return;
     state.running = true;
-    updateStats('başlatıldı');
+    state.stop = false;
+    updateStats('çalışıyor');
 
-    const tabId = await getActiveTabId();
-    const list = status === 'all' ? STATUSES : [status];
-
-    for (const st of list) {
-      if (state.stop) break;
-      await scanStatus(tabId, st, maxPages || 1, speed);
-    }
-
-    state.running = false;
-    updateStats(state.stop ? 'durduruldu' : 'tamamlandı');
-    toast(state.stop ? 'SMM taraması durduruldu.' : 'SMM taraması tamamlandı.');
-  }
-
-  function stopScan() { state.stop = true; }
-
-  function clearTable() {
-    if (!confirm('SMM tablo ve state temizlensin mi?')) return;
-    state.rows = [];
-    state.hashes.clear();
-    state.dropped = 0;
-    if (ui.tbody) ui.tbody.innerHTML = '';
-    updateStats('temizlendi');
-  }
-
-  async function copyTableMarkdown() {
-    const head = '| Sipariş ID | Tarih | Sipariş Link | Birim Fiyat | Servis | Durum | Kalan |\n|---|---|---|---:|---|---|---:|';
-    const body = state.rows.map((r) => `| ${r.orderId} | ${r.dateTime} | ${r.orderUrl} | ${r.unitPrice} | ${r.service} | ${r.status} | ${r.remains} |`).join('\n');
     try {
-      await navigator.clipboard.writeText(`${head}\n${body}`);
-      toast('SMM tablosu MD kopyalandı.');
-    } catch {
-      toast('Panoya kopyalama başarısız.');
+      const tabId = await getActiveTabId();
+      const maxPage = Math.max(1, Number(ui.maxPage?.value || 1));
+
+      for (let page = 1; page <= maxPage; page++) {
+        if (state.stop) break;
+
+        const target = buildPageUrl(BASE_URL, page);
+        await navigate(tabId, target);
+        const ctx = await extractContext(tabId);
+        const mode = detectMode(ctx.href);
+        const sourceText = ctx.domText || ctx.bodyText;
+        const blocks = mode === 'sold' ? splitBlocks(sourceText) : splitServiceBlocks(sourceText);
+
+        for (const block of blocks) {
+          if (state.stop) break;
+          try {
+            const row = mode === 'sold' ? parseSoldBlock_SMM(block) : parseServiceBlock(block);
+            const key = mode === 'sold'
+              ? `${row.orderNo}|${row.smmId}|${row.dateTime}|${row.amount}|${row.status}`
+              : `${row.serviceId}|${row.name}|${row.price}|${row.min}|${row.max}`;
+            const h = await hashRow(key);
+            if (state.hashes.has(h)) { state.dropped += 1; continue; }
+            state.hashes.add(h);
+            state.rows.push(row);
+            appendRow(row);
+          } catch (e) {
+            console.error('SMM blok parse hatası, devam:', e, block.slice(0, 260));
+          }
+        }
+
+        updateStats(`p${page}/${maxPage}`);
+      }
+    } finally {
+      state.running = false;
+      updateStats(state.stop ? 'durduruldu' : 'tamamlandı');
     }
   }
 
-  function dl(name, text, mime) {
-    const blob = new Blob([text], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
+  function stopScan(){ state.stop = true; }
+  function clearTable(){ state.rows=[]; state.hashes.clear(); state.dropped=0; if(ui.tbody) ui.tbody.innerHTML=''; updateStats('temizlendi'); }
 
-  function exportJson() { dl(`smm_${Date.now()}.json`, JSON.stringify(state.rows, null, 2), 'application/json'); }
-
-  function exportCsv() {
-    const cols = ['Sipariş ID', 'Tarih', 'Sipariş Link', 'Birim Fiyat', 'Servis', 'Durum', 'Kalan'];
-    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const lines = [cols.join(',')].concat(state.rows.map((r) => [r.orderId, r.dateTime, r.orderUrl, r.unitPrice, r.service, r.status, r.remains].map(esc).join(',')));
-    dl(`smm_${Date.now()}.csv`, '\ufeff' + lines.join('\n'), 'text/csv;charset=utf-8');
-  }
-
-  function bind() {
-    // standalone smm.html render
-    if (byId('smmPanel')) renderSmmPanel();
-
-    ui.selStatus = byId('selSmmStatus');
+  function bind(){
     ui.maxPage = byId('inpSmmMaxPage');
-    ui.timeFilter = byId('selSmmTimeFilter');
-    ui.xDays = byId('inpSmmXDays');
-    ui.speed = byId('inpScanSpeed');
     ui.tbody = byId('tblSmmBody');
     ui.stats = byId('smmStats');
     ui.empty = byId('smmEmpty');
-
-    bindOnce(byId('btnSmmStart'), 'click', 'btnSmmStart', async () => {
-      try {
-        await startScan({ status: ui.selStatus?.value || 'all', maxPages: Number(ui.maxPage?.value || 5) });
-      } catch (e) {
-        toast(`SMM tarama hatası: ${String(e?.message || e)}`);
-      }
-    });
-    bindOnce(byId('btnSmmStop'), 'click', 'btnSmmStop', () => stopScan());
-    bindOnce(byId('btnSmmClear'), 'click', 'btnSmmClear', () => clearTable());
-    bindOnce(byId('btnSmmCopyMd'), 'click', 'btnSmmCopyMd', () => copyTableMarkdown());
-    bindOnce(byId('btnSmmExportJson'), 'click', 'btnSmmExportJson', () => exportJson());
-    bindOnce(byId('btnSmmExportCsv'), 'click', 'btnSmmExportCsv', () => exportCsv());
-
-    bindOnce(ui.speed, 'change', 'inpScanSpeed', () => {
-      try {
-        parseSpeedInput();
-        updateStats('hız güncellendi');
-      } catch (e) {
-        toast(String(e?.message || e));
-        if (ui.speed) ui.speed.value = '3';
-      }
-    });
-
+    bindOnce(byId('btnSmmStart'), 'click', 'start', () => startScan().catch((e)=>toast(String(e?.message||e))));
+    bindOnce(byId('btnSmmStop'), 'click', 'stop', stopScan);
+    bindOnce(byId('btnSmmClear'), 'click', 'clear', clearTable);
     updateStats();
   }
 
-  const SMM = { init: bind, startScan, stopScan, clearTable, copyTableMarkdown, exportJson, exportCsv, buildPageUrl, speedDelayMs, hashRow };
+  const SMM = { init: bind, startScan, stopScan, buildPageUrl, splitBlocks, splitServiceBlocks, parseSoldBlock_SMM, parseServiceBlock };
   window.Patpat = window.Patpat || {};
   window.Patpat.SMM = SMM;
-
-  if (document.body?.dataset?.page === 'sidepanel' || byId('smmPanel')) {
-    SMM.init();
-  }
+  if (document.body?.dataset?.page === 'sidepanel' || byId('btnSmmStart')) SMM.init();
 })();
