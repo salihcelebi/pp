@@ -81,6 +81,11 @@
 
   async function hashRow(row) {
     const src = `${row.orderNo}|${row.smmId}|${row.dateTime}|${row.totalTl}|${row.status}`;
+    if (ui.empty) ui.empty.hidden = state.rows.length > 0;
+  }
+
+  async function hashRow(row) {
+    const src = `${row.orderNo}|${row.smmId}|${row.dateTime}|${row.totalTl}|${row.status}`;
   // [KANIT@KOD: KOŞUL/FİLTRE] 1<=speed<=100 && isNumber
   function getSpeedFactor() {
     const raw = Number(ui.inpSpeed?.value ?? state.speed);
@@ -201,6 +206,10 @@
       try {
         await navigateWait(tabId, target);
         let ext = await executeExtract(tabId);
+
+      try {
+        await navigateWait(tabId, target);
+        let ext = await executeExtract(tabId);
   async function scanStatus(tabId, status, pageLimitInput) {
     const pageLimit = Math.max(1, Number(pageLimitInput || 1));
 
@@ -219,6 +228,7 @@
           await wait(speedDelayMs());
           ext = await executeExtract(tabId);
         }
+
 
         for (const raw of ext.rows) {
           if (state.stop) return;
@@ -272,6 +282,19 @@
             if (state.hashes.has(h)) { state.dropped += 1; continue; }
             state.hashes.add(h);
             state.rows.push(row);
+            state.lastPageAdded += 1;
+            appendRow(row);
+          } catch (e) {
+            // [KANIT@KOD: HATA YAKALAMA/LOG] row parse -> continue
+            log('Hata', `Satır parse hatası (page=${page}): ${String(e?.message || e)}`);
+          }
+        }
+      } catch (e) {
+        // [KANIT@KOD: HATA YAKALAMA/LOG] page fetch/parse -> continue
+        log('Hata', `Sayfa hatası (page=${page}): ${String(e?.message || e)}`);
+      }
+
+      updateStats(`${status || 'genel'} p${page}/${maxPage}`);
             appendRow(row);
           } catch (e) {
             log('Hata', `Satır parse hatası: ${String(e?.message || e)}`);
@@ -298,6 +321,19 @@
       throw new Error('Sayfa sayısı geçersiz.');
     }
 
+    updateStats('başlatıldı');
+
+    try {
+      const tabId = await getActiveTabId();
+      const statuses = status === 'all' ? STATUSES : [status];
+      for (const st of statuses) {
+        if (state.stop) break;
+        await scanStatus(tabId, st, maxPage);
+      }
+      updateStats(state.stop ? 'durduruldu' : 'tamamlandı');
+      toast(state.stop ? 'Sipariş taraması durduruldu.' : 'Sipariş taraması tamamlandı.');
+    } finally {
+      state.running = false;
     updateStats('başlatıldı');
 
     try {
@@ -403,6 +439,9 @@
       try {
         const status = ui.selStatus?.value || 'all';
         const maxPages = parseMaxPage();
+      try {
+        const status = ui.selStatus?.value || 'all';
+        const maxPages = parseMaxPage();
     if (ui.inpSpeed) {
       ui.inpSpeed.value = String(state.speed);
       ui.inpSpeed.addEventListener('change', () => {
@@ -427,6 +466,15 @@
         toast(`Sipariş tarama hatası: ${String(e?.message || e)}`);
       }
     });
+
+    bindOnce(byId('btnSiparisStop'), 'click', 'btnSiparisStop', () => stopScan());
+    bindOnce(byId('btnSiparisClear'), 'click', 'btnSiparisClear', () => clearTable());
+    bindOnce(byId('btnSiparisCopyMd'), 'click', 'btnSiparisCopyMd', () => copyTableMarkdown());
+    bindOnce(byId('btnSiparisExportJson'), 'click', 'btnSiparisExportJson', () => exportJson());
+    bindOnce(byId('btnSiparisExportCsv'), 'click', 'btnSiparisExportCsv', () => exportCsv());
+
+    updateStats();
+  }
 
     bindOnce(byId('btnSiparisStop'), 'click', 'btnSiparisStop', () => stopScan());
     bindOnce(byId('btnSiparisClear'), 'click', 'btnSiparisClear', () => clearTable());
