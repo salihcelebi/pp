@@ -584,6 +584,21 @@
       .tabbar{flex-wrap:wrap}
       .tab{flex: 1 1 30%}
     }
+
+    /* Gelişmiş şikayet tam ekran */
+    .complaints-advanced table th, .complaints-advanced table td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.08);font-size:12px;text-align:left}
+    body.complaint-only-fullscreen .topbar,
+    body.complaint-only-fullscreen .tabbar,
+    body.complaint-only-fullscreen .mainheader,
+    body.complaint-only-fullscreen .tabpanel:not([data-tabpanel="complaints"]){display:none !important}
+    body.complaint-only-fullscreen .layout{grid-template-columns:1fr}
+    body.complaint-only-fullscreen .right{display:none}
+
+    /* Footer Puter AI (sidepanelden ayrı tema) */
+    .footer-ai{margin:12px 14px 16px; border:1px solid rgba(92,203,255,.28); background:linear-gradient(135deg, rgba(9,30,46,.95), rgba(22,46,78,.9)); border-radius:18px; padding:14px;}
+    .footer-ai .footer-head{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+    .footer-ai .footer-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}
+    @media (max-width:980px){.footer-ai .footer-grid{grid-template-columns:1fr}}
   </style>
 </head>
 
@@ -690,6 +705,9 @@
                   <option value="returnprocess">returnprocess</option>
                 </select>
                 <input id="inpSiparisMaxPage" type="number" min="1" max="50" value="5" placeholder="Max sayfa" />
+                <label class="small" style="display:flex;align-items:center;gap:6px;">Tarama Hızı (x)
+                  <input id="inpScanSpeed" type="number" min="1" max="100" value="3" style="width:82px;" />
+                </label>
                 <button class="btn primary" id="btnSiparisStart" type="button">Taramayı Başlat</button>
                 <button class="btn" id="btnSiparisStop" type="button">Durdur</button>
                 <button class="btn" id="btnSiparisClear" type="button">Temizle</button>
@@ -902,52 +920,48 @@
 
         <!-- Sekme: Şikayet -->
         <section class="tabpanel" data-tabpanel="complaints" hidden>
-          <div class="cards">
+          <div class="cards complaints-advanced" id="complaintsAdvancedPanel">
             <div class="card">
-              <h3>Müşteri Şikayet Yönetimi</h3>
-              <p>Akış: <b>Kanıtla → Açıkla → Kapat</b>. Sadece gerçek sayfadan DOM/regex ile kayıt üretir.</p>
+              <h3>MÜŞTERİ ŞİKAYET YÖNETİMİ (GELİŞMİŞ TARAMA)</h3>
+              <p>https://hesap.com.tr/p/sattigim-ilanlar?page=N akışı ile tüm sayfaları sıra bozmadan tarar.</p>
               <div class="row">
-                <input id="inpComplaintPages" type="number" min="1" max="50" value="5" placeholder="Sayfa sayısı" />
-                <label class="small" style="display:flex;align-items:center;gap:6px;">
-                  Hız
-                  <input id="rngComplaintSpeed" type="range" min="1" max="10" value="5" />
+                <label class="small" style="display:flex;align-items:center;gap:6px;">Tarih
+                  <input id="inpComplaintDate" type="text" placeholder="25.02.2026" style="width:120px;" />
                 </label>
+                <input id="inpComplaintDays" type="number" min="1" max="365" placeholder="gün sayısı" style="width:110px;" />
                 <button class="btn primary" id="btnComplaintScan" type="button">Şikayet Tara</button>
                 <button class="btn" id="btnComplaintStop" type="button">Durdur</button>
+                <button class="btn" id="btnComplaintFullscreen" type="button">MÜŞTERİ ŞİKAYET YÖNETİMİ (GELİŞMİŞ TARAMA)</button>
+                <button class="btn" id="btnComplaintOnlyFullscreen" type="button">SADECE TAM EKRAN</button>
               </div>
-              <div class="row">
-                <button class="btn primary" id="btnComplaintDraft" type="button">Yanıt Taslağı</button>
-                <button class="btn" id="btnComplaintSolution" type="button">Çözüm Öner</button>
-                <button class="btn" id="btnComplaintEscalate" type="button">Yöneticiye Eskale</button>
-                <button class="btn danger" id="btnComplaintClose" type="button">Şikayeti Kapat</button>
+              <div class="row" style="gap:14px;flex-wrap:wrap;">
+                <span class="pill"><b>SMM ID</b></span>
+                <span class="pill"><b>SİPARİŞ NO</b></span>
+                <span class="pill"><b>KALAN SAAT</b></span>
+                <span class="pill"><b>KALAN DK</b></span>
               </div>
-              <div class="row">
-                <input id="inpComplaintSearch" type="text" placeholder="Ara: SMM ID, kullanıcı, durum" />
-              </div>
-              <div class="hint" id="complaintStats">Kayıt: 0 • SLA Risk: 0</div>
+              <div class="hint" id="complaintStats">Kayıt: 0 • Durum: hazır</div>
             </div>
 
             <div class="card">
-              <h3>3 Panel</h3>
-              <div style="display:grid;grid-template-columns:1.1fr 1.2fr 1fr;gap:10px;">
-                <div>
-                  <div class="hint">Liste (SMM ID, müşteri, durum, SLA)</div>
-                  <div id="complaintsList" class="filelist" style="max-height:380px;overflow:auto;"></div>
-                </div>
-                <div>
-                  <div class="hint">Detay + Kanıt</div>
-                  <div id="complaintDetail" style="min-height:240px;"></div>
-                </div>
-                <div>
-                  <div class="hint">Eylem</div>
-                  <textarea id="complaintDraftText" class="code" style="min-height:220px;" placeholder="Yanıt taslağı burada oluşur."></textarea>
-                  <div class="row" style="margin-top:8px;">
-                    <button class="btn" id="btnComplaintCopyDraft" type="button">Taslağı Kopyala</button>
-                    <button class="btn" id="btnComplaintOpenMessage" type="button">Mesaj Sayfasına Git</button>
-                  </div>
-                  <div class="hint" id="complaintActionHint">Servis ID gizleme kontrolü: bekleniyor.</div>
-                </div>
+              <h3>Şikayet Sonuç Tablosu</h3>
+              <div style="overflow:auto; border:1px solid rgba(255,255,255,.12); border-radius:14px;">
+                <table style="width:100%; border-collapse:collapse; min-width:1100px;">
+                  <thead>
+                    <tr>
+                      <th>HİZMET</th>
+                      <th>SİPARİŞ</th>
+                      <th>SMM ID</th>
+                      <th>TARİH</th>
+                      <th>DURUM</th>
+                      <th>KALAN SÜRE</th>
+                      <th>TUTAR</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tblComplaintBody"></tbody>
+                </table>
               </div>
+              <div class="empty" id="complaintEmpty">Henüz şikayet verisi yok.</div>
             </div>
           </div>
         </section>
@@ -1084,99 +1098,51 @@
       </div>
     </section>
 
-    <!-- Sağ: Puter AI -->
-    <aside class="right" aria-label="Puter AI yardımcı alanı">
-      <div class="rightheader">
+    <!-- Footer: Puter AI -->
+    <section class="footer-ai" id="footerAiSection" aria-label="Puter AI footer alanı">
+      <div class="footer-head">
         <div>
-          <h2>Puter AI</h2>
-          <p>
-            Yalnızca <b>analiz</b>, <b>öneri</b> ve <b>taslak</b> üretir.
-            Kritik işlemler için her zaman onay ister.
-          </p>
+          <h2 style="margin:0">Puter AI</h2>
+          <p style="margin:4px 0 0 0">Yalnızca analiz/öneri üretir. Uygulama için onay gerekir.</p>
         </div>
-        <span class="kbd" title="Kısayol ipucu">Ctrl+Enter</span>
+        <span class="kbd">Ctrl+Enter</span>
       </div>
-
-      <div class="rightbody">
+      <div class="footer-grid">
         <div class="field">
           <label for="modelSelect">Model Seç (zorunlu)</label>
           <select id="modelSelect">
             <option value="" selected>Model seçmeden AI kullanılamaz</option>
             <optgroup label="GPT (OpenAI)">
-              <option value="gpt-5.2">gpt-5.2</option>
-              <option value="gpt-5.1">gpt-5.1</option>
-              <option value="gpt-5">gpt-5</option>
-              <option value="gpt-5-mini">gpt-5-mini</option>
-              <option value="gpt-5-nano">gpt-5-nano</option>
+              <option value="gpt-5.2">gpt-5.2</option><option value="gpt-5.1">gpt-5.1</option><option value="gpt-5">gpt-5</option><option value="gpt-5-mini">gpt-5-mini</option><option value="gpt-5-nano">gpt-5-nano</option>
             </optgroup>
             <optgroup label="Gemini (Google)">
-              <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview</option>
-              <option value="gemini-3-pro-preview">gemini-3-pro-preview</option>
-              <option value="gemini-3-flash-preview">gemini-3-flash-preview</option>
-              <option value="gemini-2.5-pro">gemini-2.5-pro</option>
-              <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+              <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview</option><option value="gemini-3-pro-preview">gemini-3-pro-preview</option><option value="gemini-3-flash-preview">gemini-3-flash-preview</option><option value="gemini-2.5-pro">gemini-2.5-pro</option><option value="gemini-2.5-flash">gemini-2.5-flash</option>
             </optgroup>
             <optgroup label="Claude (Anthropic)">
-              <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
-              <option value="claude-opus-4-6">claude-opus-4-6</option>
-              <option value="claude-opus-4-5">claude-opus-4-5</option>
-              <option value="claude-sonnet-4-5">claude-sonnet-4-5</option>
-              <option value="claude-haiku-4-5">claude-haiku-4-5</option>
+              <option value="claude-sonnet-4-6">claude-sonnet-4-6</option><option value="claude-opus-4-6">claude-opus-4-6</option><option value="claude-opus-4-5">claude-opus-4-5</option><option value="claude-sonnet-4-5">claude-sonnet-4-5</option><option value="claude-haiku-4-5">claude-haiku-4-5</option>
             </optgroup>
           </select>
           <div class="hint" id="modelHint">Model seçince AI butonları açılır.</div>
         </div>
-
-        <div class="divider"></div>
-
-        <div class="card" style="margin:0; padding:12px;">
-          <h3>Hazır Komutlar</h3>
-          <p>Seçili sekmeye göre otomatik bağlam eklenir.</p>
-          <div class="row">
-            <button class="btn" id="cmdFix" type="button">Hata Düzelt</button>
-            <button class="btn" id="cmdRefactor" type="button">Düzenle</button>
-            <button class="btn" id="cmdI18n" type="button">Türkçeleştir</button>
-            <button class="btn" id="cmdPerf" type="button">Hızlandır</button>
-            <button class="btn" id="cmdSecurity" type="button">Güvenlik</button>
-            <button class="btn" id="cmdManifest" type="button">Manifest Doğrula</button>
-          </div>
-          <div class="small" style="margin-top:10px;">
-            İpucu: AI çıktısı “öneri”dir. Uygulama, her zaman onay ister.
-          </div>
-        </div>
-
-        <div class="divider"></div>
-
         <div class="field">
-          <label for="aiPrompt">AI’ye Gönderilecek Not (isteğe bağlı)</label>
+          <label for="aiPrompt">AI’ye Gönderilecek Not</label>
           <textarea id="aiPrompt" placeholder="Örn: Bu sekmede kullanıcıyı en az tıklamayla hedefe ulaştır."></textarea>
-
-          <div class="card" style="margin:0; padding:12px;">
-            <h3>Kod Bağlamı</h3>
-            <p>Bu ayar özellikle “Chrome Eklenti Dosyaları” sekmesinde kullanılır.</p>
-            <div class="small" id="aiContextInfo">Aktif dosya: —</div>
-            <div class="row" style="margin-top:10px;">
-              <button class="btn" id="btnUseSelection" type="button" disabled>Seçili Kodu Kullan</button>
-              <button class="btn" id="btnUseWholeFile" type="button" disabled>Tüm Dosyayı Kullan</button>
-            </div>
-            <div class="small" style="margin-top:8px;">
-              Not: Seçim yoksa sistem otomatik “tüm dosya” kullanır.
-            </div>
-          </div>
-
-          <div class="row" style="margin-top:10px;">
-            <button class="btn primary" id="btnAiAnalyze" type="button" disabled>AI ile Analiz Et</button>
-            <button class="btn" id="btnAiPreviewPatch" type="button" disabled>Patch Önizle</button>
-            <button class="btn primary" id="btnAiApplyPatch" type="button" disabled>Patch Uygula</button>
-            <button class="btn" id="btnAiCopy" type="button" disabled>Öneriyi Kopyala</button>
-          </div>
-
-          <div class="small" id="aiResultHint" style="margin-top:10px;">
-            Henüz öneri yok. Model seçip “AI ile Analiz Et”e bas.
-          </div>
+          <div class="small" id="aiContextInfo">Aktif dosya: —</div>
         </div>
       </div>
-    </aside>
+      <div class="row" style="margin-top:10px;flex-wrap:wrap">
+        <button class="btn" id="cmdFix" type="button">Hata Düzelt</button><button class="btn" id="cmdRefactor" type="button">Düzenle</button><button class="btn" id="cmdI18n" type="button">Türkçeleştir</button><button class="btn" id="cmdPerf" type="button">Hızlandır</button><button class="btn" id="cmdSecurity" type="button">Güvenlik</button><button class="btn" id="cmdManifest" type="button">Manifest Doğrula</button>
+      </div>
+      <div class="row" style="margin-top:10px;flex-wrap:wrap">
+        <button class="btn" id="btnUseSelection" type="button" disabled>Seçili Kodu Kullan</button>
+        <button class="btn" id="btnUseWholeFile" type="button" disabled>Tüm Dosyayı Kullan</button>
+        <button class="btn primary" id="btnAiAnalyze" type="button" disabled>AI ile Analiz Et</button>
+        <button class="btn" id="btnAiPreviewPatch" type="button" disabled>Patch Önizle</button>
+        <button class="btn primary" id="btnAiApplyPatch" type="button" disabled>Patch Uygula</button>
+        <button class="btn" id="btnAiCopy" type="button" disabled>Öneriyi Kopyala</button>
+      </div>
+      <div class="small" id="aiResultHint" style="margin-top:10px;">Henüz öneri yok. Model seçip “AI ile Analiz Et”e bas.</div>
+    </section>
   </main>
 
   <div class="modal" id="patchModal" role="dialog" aria-modal="true" aria-label="Patch önizleme">
@@ -1198,6 +1164,7 @@
   <script src="siparis.js"></script>
   <script src="smm.js"></script>
   <script src="sikayet.js"></script>
+  <script src="footer.js"></script>
   <script src="bundle.js"></script>
 </body>
 </html>
