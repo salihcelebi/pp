@@ -1,0 +1,45 @@
+<section class="footer-ai" id="footerAiSection" aria-label="Puter AI footer alanı">
+  <div class="footer-head">
+    <div>
+      <h2 style="margin:0">Puter AI</h2>
+      <p style="margin:4px 0 0 0">Yalnızca analiz/öneri üretir. Uygulama için onay gerekir.</p>
+    </div>
+    <span class="kbd">Ctrl+Enter</span>
+  </div>
+  <div class="footer-grid">
+    <div class="field">
+      <label for="modelSelect">Model Seç (zorunlu)</label>
+      <select id="modelSelect">
+        <option value="" selected>Model seçmeden AI kullanılamaz</option>
+        <option value="gpt-5.2">gpt-5.2</option>
+        <option value="gpt-5.1">gpt-5.1</option>
+        <option value="gpt-5">gpt-5</option>
+        <option value="gpt-5-mini">gpt-5-mini</option>
+        <option value="gpt-5-nano">gpt-5-nano</option>
+      </select>
+      <div class="hint" id="modelHint">Model seçince AI butonları açılır.</div>
+    </div>
+    <div class="field">
+      <label for="aiPrompt">AI’ye Gönderilecek Not</label>
+      <textarea id="aiPrompt" placeholder="Örn: Bu sekmede kullanıcıyı en az tıklamayla hedefe ulaştır."></textarea>
+      <div class="small" id="aiContextInfo">Aktif dosya: —</div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:10px;flex-wrap:wrap">
+    <button class="btn" id="cmdFix" type="button">Hata Düzelt</button>
+    <button class="btn" id="cmdRefactor" type="button">Düzenle</button>
+    <button class="btn" id="cmdI18n" type="button">Türkçeleştir</button>
+    <button class="btn" id="cmdPerf" type="button">Hızlandır</button>
+    <button class="btn" id="cmdSecurity" type="button">Güvenlik</button>
+    <button class="btn" id="cmdManifest" type="button">Manifest Doğrula</button>
+  </div>
+  <div class="row" style="margin-top:10px;flex-wrap:wrap">
+    <button class="btn" id="btnUseSelection" type="button" disabled>Seçili Kodu Kullan</button>
+    <button class="btn" id="btnUseWholeFile" type="button" disabled>Tüm Dosyayı Kullan</button>
+    <button class="btn primary" id="btnAiAnalyze" type="button" disabled>AI ile Analiz Et</button>
+    <button class="btn" id="btnAiPreviewPatch" type="button" disabled>Patch Önizle</button>
+    <button class="btn primary" id="btnAiApplyPatch" type="button" disabled>Patch Uygula</button>
+    <button class="btn" id="btnAiCopy" type="button" disabled>Öneriyi Kopyala</button>
+  </div>
+  <div class="small" id="aiResultHint" style="margin-top:10px;">Henüz öneri yok. Model seçip “AI ile Analiz Et”e bas.</div>
+</section>

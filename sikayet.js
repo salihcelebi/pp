@@ -27,6 +27,16 @@
   function todayTR(){ const d=new Date(); return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`; }
   function validateDate(v){ return /^\d{2}\.\d{2}\.\d{4}$/.test(String(v||'')); }
 
+  const RX_STRICT_DATE_TIME = /\b(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})\b/;
+  function parseStrictDateTime(text){
+    const m = String(text||'').match(RX_STRICT_DATE_TIME);
+    if(!m) return null;
+    const iso = `${m[3]}-${m[2]}-${m[1]}T${m[4]}:${m[5]}`;
+    const d = new Date(iso);
+    if(Number.isNaN(d.getTime())) return null;
+    return d;
+  }
+
   function parseComplaintBlock_SIKAYET(block, idx, baseDate){
     const status = pickFirstMatch(RX_STATUS_15, block);
     if(!/Sorun\s*Bildirildi/i.test(status)) return null;
@@ -56,12 +66,47 @@
     if(state.running) return toast('Tarama zaten çalışıyor');
     const dateVal = String(ui.dateInput?.value||'').trim();
     if(!validateDate(dateVal)) return toast('Tarih GG.AA.YYYY olmalı');
+    const days = Math.max(1, Number(ui.daysInput?.value || 7));
+    const [dd,mm,yy] = dateVal.split('.').map(Number);
+    const today = new Date(yy, (mm||1)-1, dd||1, 23, 59, 59);
+    const minDate = new Date(today.getTime() - (days * 24 * 3600 * 1000));
+
     state.running=true; state.shouldStop=false; console.log('scan start'); render();
     const tabId=await getActiveTabId();
+    // zorunlu başlangıç ziyareti
+    await navigate(tabId, SOLD_BASE_URL);
+
     const seen=new Set(state.rows.map((r)=>`${r.orderNo}|${r.smmId}|${r.dateTime}|${r.amountText}`));
     let page=1; let loops=0;
-    while(!state.shouldStop && loops<250){ loops++; const url=buildPageUrl(SOLD_BASE_URL,page); try{ await navigate(tabId,url); const blocks=splitBlocks(await pageText(tabId)); if(!blocks.length) break; let added=0; for(let i=0;i<blocks.length;i++){ if(state.shouldStop) break; try{ const rec=parseComplaintBlock_SIKAYET(blocks[i],`${page}-${i}`,dateVal); if(!rec) continue; const key=`${rec.orderNo}|${rec.smmId}|${rec.dateTime}|${rec.amountText}`; if(seen.has(key)) continue; seen.add(key); state.rows.push(rec); added++; }catch(e){ console.error(`Blok parse hatası url=${url}`,e);} }
-        await saveAndRefresh(); if(added===0) break; page++; } catch(e){ console.error(`Sayfa parse hatası url=${url}`,e); page++; } }
+    while(!state.shouldStop && loops<250){
+      loops++;
+      const url=buildPageUrl(SOLD_BASE_URL,page);
+      try{
+        await navigate(tabId,url);
+        const blocks=splitBlocks(await pageText(tabId));
+        if(!blocks.length) break;
+        let added=0;
+        let olderSeen=0;
+        for(let i=0;i<blocks.length;i++){
+          if(state.shouldStop) break;
+          try{
+            const rec=parseComplaintBlock_SIKAYET(blocks[i],`${page}-${i}`,dateVal);
+            if(!rec) continue;
+            const dt = parseStrictDateTime(rec.dateTime);
+            if(!dt){ console.error('Tarih parse fail', rec.dateTime); continue; }
+            if(dt < minDate){ olderSeen += 1; continue; }
+            const key=`${rec.orderNo}|${rec.smmId}|${rec.dateTime}|${rec.amountText}`;
+            if(seen.has(key)) continue;
+            seen.add(key);
+            state.rows.push(rec);
+            added++;
+          }catch(e){ console.error(`Blok parse hatası url=${url}`,e); }
+        }
+        await saveAndRefresh();
+        if(added===0 && olderSeen>0) break;
+        page++;
+      } catch(e){ console.error(`Sayfa parse hatası url=${url}`,e); page++; }
+    }
     state.running=false; render(); toast(state.shouldStop?'Tarama durdu':`Tarama tamamlandı: ${state.rows.length}`);
   }
 
@@ -74,7 +119,7 @@
   function stop(){ state.shouldStop=true; }
 
   async function load(){ const x=await getLocal(KEY); state.rows=Array.isArray(x)?x:[]; render(); }
-  function bind(){ ui.dateInput=byId('inpComplaintDate'); ui.search=byId('inpComplaintSearch'); ui.stats=byId('complaintStats'); ui.list=byId('complaintsList'); ui.empty=byId('complaintEmpty'); ui.detail=byId('complaintDetail'); ui.selStatus=byId('selComplaintStatus'); ui.draft=byId('complaintDraftText'); if(ui.dateInput&&!ui.dateInput.value) ui.dateInput.value=todayTR();
+  function bind(){ ui.dateInput=byId('inpComplaintDate'); ui.daysInput=byId('inpComplaintDays'); ui.search=byId('inpComplaintSearch'); ui.stats=byId('complaintStats'); ui.list=byId('complaintsList'); ui.empty=byId('complaintEmpty'); ui.detail=byId('complaintDetail'); ui.selStatus=byId('selComplaintStatus'); ui.draft=byId('complaintDraftText'); if(ui.dateInput&&!ui.dateInput.value) ui.dateInput.value=todayTR(); if(ui.daysInput&&!ui.daysInput.value) ui.daysInput.value='7';
     bindOnce(byId('btnComplaintScan'),'click','scan',()=>scanComplaints().catch((e)=>toast(String(e?.message||e)))); bindOnce(byId('btnComplaintStop'),'click','stop',stop); bindOnce(byId('btnComplaintDraft'),'click','draft',draft); bindOnce(byId('btnComplaintSolution'),'click','sol',solution); bindOnce(byId('btnComplaintEscalate'),'click','esc',()=>escalate().catch(()=>{})); bindOnce(byId('btnComplaintClose'),'click','close',()=>closeComplaint().catch(()=>{})); bindOnce(byId('btnComplaintSaveStatus'),'click','save',()=>saveStatus().catch(()=>{})); bindOnce(ui.search,'input','search',render); render(); }
 
   const Sikayet={init:async()=>{bind(); await load();},scanComplaints,stopScan:stop,buildPageUrl}; window.Patpat=window.Patpat||{}; window.Patpat.Sikayet=Sikayet; if(document.body?.dataset?.page==='sidepanel'||byId('btnComplaintScan')) Sikayet.init();

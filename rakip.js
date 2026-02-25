@@ -8,6 +8,13 @@
   const SOLD_BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar';
   const BOUND = new Set();
 
+  const PLATFORM_SERVICE_MAP = Object.freeze({
+    tiktok: ['hepsi','hesap','takipci','begeni','izlenme','yorum','kaydet','paylas'],
+    instagram: ['hepsi','hesap','takipci','begeni','izlenme','yorum','kaydet','paylas'],
+    youtube: ['hepsi','hesap','takipci','begeni','izlenme','yorum','abone'],
+    twitter: ['hepsi','hesap','takipci','begeni','izlenme','yorum']
+  });
+
   const RX_TITLE_15 = [/^([^\n]{10,200})\n(?=[\s\S]*?\bSipariş\s*#\d+)/mi,/^([^\n]{10,200})\n[^\n]{0,200}\n\s*Sipariş\s*#\d+/mi,/(?:^|\n)([^\n]{10,200})\n(?:\1|\s*[^\n]{10,200})\n\s*Sipariş\s*#\d+/mi,/([^\n]{10,200})\s*\n\s*Sipariş\s*#\d+/mi,/([^\n]{10,200})\s*(?=\s*\n\s*\n\s*Sipariş\s*#\d+)/mi,/([^\n]{10,200})\s*\n\s*\n\s*Sipariş\s*#\d+/mi,/([A-ZÇĞİÖŞÜ0-9][^\n]{8,200})\n(?=Sipariş\s*#\d+)/m,/(?:YOUTUBE|TİKTOK|TikTok|Instagram|INSTAGRAM)\b[^\n]{5,200}/m,/^(.*(?:Beğeni|Takipçi|İzlenme|Yorum|Kaydet)[^\n]{0,160})$/mi,/^(.{10,200})$/m,/([^\n]{10,200})(?=\nSMM\s*ID:)/mi,/([^\n]{10,200})(?=\n\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})/mi,/([^\n]{10,200})(?=\n(?:Teslim|İptal|Müşteri|Sorun))/mi,/([^\n]{10,200})(?=\nToplam\s*Tutar)/mi,/([^\n]{10,200})(?=\n[\s\S]*?TL)/mi];
   const RX_ORDER_15=[/\bSipariş\s*#(\d{5,12})\b/i,/\bSİPARİŞ\s*#(\d{5,12})\b/i,/#\s*(\d{5,12})\b/i,/\bSiparis\s*#(\d{5,12})\b/i,/\bSipariş\s*No[:\s]*#?(\d{5,12})\b/i,/\bSipariş[:\s]*#?(\d{5,12})\b/i,/\bOrder\s*#(\d{5,12})\b/i,/\bSipariş\s*ID[:\s]*#?(\d{5,12})\b/i,/\bSipariş\s*Numarası[:\s]*#?(\d{5,12})\b/i,/\bSipariş\s*-\s*#?(\d{5,12})\b/i,/\bSIPARIS\s*#(\d{5,12})\b/i,/\bSIPARIS[:\s]*#?(\d{5,12})\b/i,/\bSipariş\s*\n\s*#(\d{5,12})\b/i,/(?:^|\n)\s*Sipariş\s*#(\d{5,12})/i,/\b(\d{5,12})\b(?=[\s\S]*?SMM\s*ID:|\s*\n\s*\d{2}\.\d{2}\.\d{4})/i];
   const RX_SMM_15=[/\bSMM\s*ID:\s*(\d{4,12})\b/i,/\bSMMID:\s*(\d{4,12})\b/i,/\bSMM\s*No[:\s]*(\d{4,12})\b/i,/\bSMM\s*#\s*(\d{4,12})\b/i,/\bID:\s*(\d{4,12})\b(?=[\s\S]*?\d{2}\.\d{2}\.\d{4})/i,/\bSMM\s*Kimlik[:\s]*(\d{4,12})\b/i,/\bSMM\s*Numara[:\s]*(\d{4,12})\b/i,/\bSMM\s*[:\s]*(\d{4,12})\b/i,/(?:^|\n)\s*(\d{4,12})\s*(?=\n\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})/m,/(?:^|\n)\s*SMM\s*\n\s*ID[:\s]*(\d{4,12})/mi,/\bSMM\s*I[D|d]\s*[:\-]\s*(\d{4,12})\b/i,/\bSMM\s*Id\s*[:\-]\s*(\d{4,12})\b/i,/\bSMM\s*IDENTIFIER[:\s]*(\d{4,12})\b/i,/\bSMM\s*CODE[:\s]*(\d{4,12})\b/i,/\b(\d{4,12})\b(?=[\s\S]*?Toplam\s*Tutar)/i];
@@ -23,6 +30,19 @@
   function splitBlocks(pageText){ return String(pageText||'').split(/(?=Sipariş\s*#\d+)/i).map((x)=>x.trim()).filter(Boolean); }
   function buildPageUrl(base,page){ return `${base}?page=${page}`; }
   function speedDelayMs(){ const n=Math.max(1,Math.min(100,Number(ui.inpSpeed?.value||3))); return Math.max(30,Math.round(1600/n)); }
+
+  function renderServiceOptions(){
+    const p = String(ui.selPlatform?.value || '');
+    if (!ui.selService) return;
+    if (!p) {
+      ui.selService.innerHTML = '<option value="">Önce platform seç</option>';
+      ui.selService.disabled = true;
+      return;
+    }
+    const list = p === 'hepsi' ? ['hepsi', ...new Set(Object.values(PLATFORM_SERVICE_MAP).flat())] : (PLATFORM_SERVICE_MAP[p] || ['hepsi']);
+    ui.selService.innerHTML = list.map((x)=>`<option value="${x}">${x}</option>`).join('');
+    ui.selService.disabled = false;
+  }
   async function hashRow(r){ const src=`${r.platform}|${r.ilanBasligi}|${r.hizmet}|${r.magaza}|${r.garanti}|${r.fiyat}|${r.reklam}`; const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(src)); return Array.from(new Uint8Array(d)).map((b)=>b.toString(16).padStart(2,'0')).join(''); }
   function statusLine(t){ if(ui.statusLine) ui.statusLine.textContent=`Durum: ${t}`; }
   function updateStats(){ const pages=Object.keys(state.pageCounts).sort((a,b)=>a-b).map((k)=>`p${k}:${state.pageCounts[k]}`).join(' | '); if(ui.stats) ui.stats.textContent=`Toplam bulunan: ${state.rows.length} • Dedup atılan: ${state.dropped} • Sayfa başına: ${pages||'—'}`; if(ui.empty) ui.empty.hidden=state.rows.length>0; }
@@ -37,7 +57,7 @@
 
   async function startScan(){
     if(state.running) return;
-    const platform=String(ui.selPlatform?.value||'').trim(); if(!platform) return toast('Önce platform seç');
+    const platform=String(ui.selPlatform?.value||'').trim(); if(!platform) return toast('Önce platform seç'); const service=String(ui.selService?.value||'hepsi').trim();
     const minTxt=String(ui.inpQtyMin?.value||'').trim(); const maxTxt=String(ui.inpQtyMax?.value||'').trim(); const min=minTxt?Number(minTxt):null; const max=maxTxt?Number(maxTxt):null; if((minTxt&&(!Number.isFinite(min)||min<0))||(maxTxt&&(!Number.isFinite(max)||max<0))||(min!=null&&max!=null&&min>max)) return toast('Min/Max adet geçersiz');
     const maxPage=Math.max(1,Number(ui.inpPage?.value||1));
     state.running=true; state.shouldStop=false; state.pageCounts={}; statusLine('çalışıyor');
@@ -45,7 +65,7 @@
     for(let page=1; page<=maxPage; page++){
       if(state.shouldStop) break;
       const soldMode = true;
-      const url = soldMode ? buildPageUrl(SOLD_BASE_URL,page) : buildPageUrl(`${BASE_URL}/${platform}`,page);
+      const url = soldMode ? buildPageUrl(SOLD_BASE_URL,page) : buildPageUrl(`${BASE_URL}/${platform}/${service||'hepsi'}`,page);
       try {
         await navigate(tabId,url);
         const blocks = splitBlocks(await pageText(tabId));
@@ -63,13 +83,14 @@
   }
 
   function stop(){ state.shouldStop=true; statusLine('durduruluyor'); }
-  function clear(){ state.rows=[]; state.hashes.clear(); state.dropped=0; state.pageCounts={}; if(ui.tblBody) ui.tblBody.innerHTML=''; updateStats(); statusLine('hazır'); }
+  function clear(){ state.rows=[]; state.hashes.clear(); state.dropped=0; state.pageCounts={}; if(ui.tblBody) ui.tblBody.innerHTML=''; renderServiceOptions(); updateStats(); statusLine('hazır'); }
   function dl(n,t,m){ const b=new Blob([t],{type:m}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u;a.download=n;a.click(); setTimeout(()=>URL.revokeObjectURL(u),1000);} function exportJson(){dl(`rakip_${Date.now()}.json`,JSON.stringify(state.rows,null,2),'application/json');} function exportCsv(){const cols=['platform','ilanBasligi','hizmet','magaza','garanti','fiyat','reklam']; const esc=(v)=>`"${String(v??'').replace(/"/g,'""')}"`; const lines=[cols.join(',')].concat(state.rows.map((r)=>cols.map((k)=>esc(r[k])).join(','))); dl(`rakip_${Date.now()}.csv`,'\ufeff'+lines.join('\n'),'text/csv;charset=utf-8');}
   function testRegex(){ try{ const t=String(ui.regexInput?.value||'').trim(); if(!t){ if(ui.regexPreview) ui.regexPreview.textContent='Regex boş'; return; } const rx=new RegExp(t,'i'); const s=state.rows[0]?.ilanBasligi||'örnek'; if(ui.regexPreview) ui.regexPreview.textContent=rx.test(s)?'Regex eşleşti':'Regex eşleşmedi'; }catch(e){ if(ui.regexPreview) ui.regexPreview.textContent=`Regex hatası: ${String(e?.message||e)}`; toast('Geçersiz regex'); }}
   function toggleFullscreen(){ (byId('rakipRoot')||document.body).classList.toggle('rakip-fullscreen'); }
 
-  function bind(){ ui.selPlatform=byId('selPlatform'); ui.inpQtyMin=byId('inpQtyMin'); ui.inpQtyMax=byId('inpQtyMax'); ui.inpPage=byId('inpRakipPageCount'); ui.inpSpeed=byId('inpScanSpeed'); ui.tblBody=byId('tblRakipBody'); ui.stats=byId('rakipStats'); ui.empty=byId('marketEmpty'); ui.statusLine=byId('rakipStatusLine'); ui.regexInput=byId('inpRakipRegex'); ui.regexPreview=byId('rakipRegexPreview');
-    bindOnce(byId('btnRakipStart'),'click','start',()=>startScan().catch((e)=>toast(String(e?.message||e)))); bindOnce(byId('btnRakipStop'),'click','stop',stop); bindOnce(byId('btnRakipClear'),'click','clear',clear); bindOnce(byId('btnRakipCopyMd'),'click','md',()=>{}); bindOnce(byId('btnRakipExportJson'),'click','json',exportJson); bindOnce(byId('btnRakipExportCsv'),'click','csv',exportCsv); bindOnce(byId('btnRakipRegexTest'),'click','regex',testRegex); bindOnce(byId('btnRakipRegexPanel'),'click','regex2',testRegex); bindOnce(byId('btnRakipFullscreen'),'click','full',toggleFullscreen); updateStats(); statusLine('hazır'); }
+  function bind(){ ui.selPlatform=byId('selPlatform'); ui.selService=byId('selService'); ui.inpQtyMin=byId('inpQtyMin'); ui.inpQtyMax=byId('inpQtyMax'); ui.inpPage=byId('inpRakipPageCount'); ui.inpSpeed=byId('inpScanSpeed'); ui.tblBody=byId('tblRakipBody'); ui.stats=byId('rakipStats'); ui.empty=byId('marketEmpty'); ui.statusLine=byId('rakipStatusLine'); ui.regexInput=byId('inpRakipRegex'); ui.regexPreview=byId('rakipRegexPreview');
+    bindOnce(ui.selPlatform,'change','platform',()=>{ if(ui.selService){ ui.selService.value=''; } renderServiceOptions(); });
+    bindOnce(byId('btnRakipStart'),'click','start',()=>startScan().catch((e)=>toast(String(e?.message||e)))); bindOnce(byId('btnRakipStop'),'click','stop',stop); bindOnce(byId('btnRakipClear'),'click','clear',clear); bindOnce(byId('btnRakipCopyMd'),'click','md',()=>{}); bindOnce(byId('btnRakipExportJson'),'click','json',exportJson); bindOnce(byId('btnRakipExportCsv'),'click','csv',exportCsv); bindOnce(byId('btnRakipRegexTest'),'click','regex',testRegex); bindOnce(byId('btnRakipRegexPanel'),'click','regex2',testRegex); bindOnce(byId('btnRakipFullscreen'),'click','full',toggleFullscreen); renderServiceOptions(); updateStats(); statusLine('hazır'); }
 
   const Rakip={init:bind,startScan,stopScan:stop,clearTable:clear,exportJson,exportCsv,buildPageUrl,hashRow,speedDelayMs}; window.Patpat=window.Patpat||{}; window.Patpat.Rakip=Rakip; if(document.body?.dataset?.page==='sidepanel'||byId('btnRakipStart')) Rakip.init();
 })();
