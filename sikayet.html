@@ -60,6 +60,20 @@
     </div>
   </div>
 
+<head><meta charset="utf-8"><title>Müşteri Şikayet Yönetimi</title></head>
+<body>
+  <h1>MÜŞTERİ ŞİKAYET YÖNETİMİ (GELİŞMİŞ TARAMA)</h1>
+  <button id="btnComplaintFullscreen" type="button">MÜŞTERİ ŞİKAYET YÖNETİMİ (GELİŞMİŞ TARAMA)</button>
+  <button id="btnComplaintOnlyFullscreen" type="button">SADECE TAM EKRAN</button>
+  <input id="inpComplaintDate" type="text" placeholder="25.02.2026">
+  <button id="btnComplaintScan" type="button">Şikayet Tara</button>
+  <button id="btnComplaintStop" type="button">Durdur</button>
+  <table>
+    <thead><tr><th>HİZMET</th><th>SİPARİŞ</th><th>SMM ID</th><th>TARİH</th><th>DURUM</th><th>KALAN SÜRE</th><th>TUTAR</th></tr></thead>
+    <tbody id="tblComplaintBody"></tbody>
+  </table>
+  <div id="complaintStats"></div>
+  <div id="complaintEmpty"></div>
   <script src="sikayet.js"></script>
 </body>
 </html>

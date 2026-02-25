@@ -16,6 +16,7 @@
     running: false,
     speed: 3,
     lastPageAdded: 0
+    speed: 3
   };
 
   const ui = {};
@@ -26,6 +27,8 @@
   function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
   function normalizeSpace(v) { return String(v || '').replace(/\s+/g, ' ').trim(); }
 
+
+  function normalizeSpace(v) { return String(v || '').replace(/\s+/g, ' ').trim(); }
   function normalizeStatus(s) {
     const t = normalizeSpace(s).toLowerCase();
     if (t.includes('teslimat bekleniyor')) return 'pending';
@@ -78,6 +81,35 @@
 
   async function hashRow(row) {
     const src = `${row.orderNo}|${row.smmId}|${row.dateTime}|${row.totalTl}|${row.status}`;
+    if (ui.empty) ui.empty.hidden = state.rows.length > 0;
+  }
+
+  async function hashRow(row) {
+    const src = `${row.orderNo}|${row.smmId}|${row.dateTime}|${row.totalTl}|${row.status}`;
+  // [KANIT@KOD: KOŞUL/FİLTRE] 1<=speed<=100 && isNumber
+  function getSpeedFactor() {
+    const raw = Number(ui.inpSpeed?.value ?? state.speed);
+    if (!Number.isFinite(raw) || raw < 1 || raw > 100) {
+      throw new Error('Tarama hızı 1-100 arasında sayısal olmalıdır.');
+    }
+    state.speed = raw;
+    return raw;
+  }
+
+  // [KANIT@KOD: DÖNÜŞÜM] speed_factor_to_delay
+  function speedDelayMs() {
+    const factor = Math.max(1, Math.min(100, Number(state.speed || 3)));
+    const delay = Math.round(1800 / factor);
+    return Math.max(40, delay);
+  }
+
+  function updateStats(extra = 'beklemede') {
+    if (ui.stats) ui.stats.textContent = `Satır: ${state.rows.length} • Atılan: ${state.dropped} • Hız: ${state.speed}x • Durum: ${extra}`;
+    if (ui.empty) ui.empty.hidden = state.rows.length > 0;
+  }
+
+  async function hashRow(r) {
+    const src = `${r.orderNo}|${r.smmId}|${r.dateTime}|${r.totalTl}|${r.status}`;
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(src));
     return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
   }
@@ -87,6 +119,13 @@
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${row.title}</td><td>${row.orderNo}</td><td>${row.smmId}</td><td>${row.dateTime}</td><td>${row.status}</td><td>${row.totalTl}</td><td>${row.username || ''}</td>`;
     ui.tbody.appendChild(tr);
+  }
+
+  // [KANIT@KOD: DÖNÜŞÜM] url_build_page
+  function buildPageUrl(status, page) {
+    const qs = [`page=${page}`];
+    if (status) qs.push(`status=${encodeURIComponent(status)}`);
+    return `${BASE_URL}?${qs.join('&')}`;
   }
 
   async function getActiveTabId() {
@@ -118,6 +157,8 @@
         for (let y = 0; y < document.body.scrollHeight; y += step) {
           window.scrollTo({ top: y, behavior: 'auto' });
           await sleep(120);
+          y += step;
+          await sleep(140);
         }
 
         const clean = (v) => String(v || '').replace(/\s+/g, ' ').trim();
@@ -137,12 +178,14 @@
             if (orderNo || smmId) {
               rows.push({ title, orderNo, smmId, dateTime, statusRaw, totalTl, username, error: '' });
             }
+            if (orderNo || smmId) rows.push({ title, orderNo, smmId, dateTime, statusRaw, totalTl, username, error: '' });
           } catch (e) {
             rows.push({ title: '', orderNo: '', smmId: '', dateTime: '', statusRaw: '', totalTl: '', username: '', error: String(e?.message || e) });
           }
         }
 
         return { rows };
+        return { rows, pageText: String(document.body.innerText || '') };
       }
     });
     return result || { rows: [] };
@@ -163,10 +206,63 @@
       try {
         await navigateWait(tabId, target);
         let ext = await executeExtract(tabId);
+
+      try {
+        await navigateWait(tabId, target);
+        let ext = await executeExtract(tabId);
+  async function scanStatus(tabId, status, pageLimitInput) {
+    const pageLimit = Math.max(1, Number(pageLimitInput || 1));
+
+    // [KANIT@KOD: DÖNGÜ/BİTİRME] for page=1..K
+    for (let p = 1; p <= pageLimit; p++) {
+      if (state.stop) return;
+      const url = buildPageUrl(status, p);
+      updateStats(`${status || 'genel'} p${p}/${pageLimit}`);
+
+      try {
+        await navigateWait(tabId, url);
+        let ext = await executeExtract(tabId);
+
         if (!ext.rows.length) {
           await chrome.tabs.reload(tabId);
           await wait(speedDelayMs());
           ext = await executeExtract(tabId);
+        }
+
+
+        for (const raw of ext.rows) {
+          if (state.stop) return;
+          try {
+            const row = {
+              title: normalizeSpace(raw.title),
+              orderNo: raw.orderNo || '',
+              smmId: raw.smmId || '',
+              dateTime: raw.dateTime || '',
+              status: normalizeStatus(raw.statusRaw || status || ''),
+              totalTl: Number(String(raw.totalTl || '0').replace(/\./g, '').replace(',', '.')) || 0,
+              username: raw.username || '',
+              error: raw.error || ''
+            };
+            const h = await hashRow(row);
+            if (state.hashes.has(h)) { state.dropped += 1; continue; }
+            state.hashes.add(h);
+            state.rows.push(row);
+            state.lastPageAdded += 1;
+            appendRow(row);
+          } catch (e) {
+            // [KANIT@KOD: HATA YAKALAMA/LOG] row parse -> continue
+            log('Hata', `Satır parse hatası (page=${page}): ${String(e?.message || e)}`);
+          }
+        }
+      } catch (e) {
+        // [KANIT@KOD: HATA YAKALAMA/LOG] page fetch/parse -> continue
+        log('Hata', `Sayfa hatası (page=${page}): ${String(e?.message || e)}`);
+      }
+
+      updateStats(`${status || 'genel'} p${page}/${maxPage}`);
+        if (!ext.rows.length) {
+          log('Hata', `[KANIT@KOD: HATA YAKALAMA/LOG] Sayfa ${p} veri alınamadı, sonraki sayfaya geçiliyor.`);
+          continue;
         }
 
         for (const raw of ext.rows) {
@@ -199,6 +295,16 @@
       }
 
       updateStats(`${status || 'genel'} p${page}/${maxPage}`);
+            appendRow(row);
+          } catch (e) {
+            log('Hata', `Satır parse hatası: ${String(e?.message || e)}`);
+          }
+        }
+      } catch (e) {
+        // [KANIT@KOD: HATA YAKALAMA/LOG] LOG+SAFE+continue
+        log('Hata', `Sayfa tarama hatası p${p}: ${String(e?.message || e)}`);
+      }
+
       await wait(speedDelayMs());
     }
   }
@@ -228,6 +334,28 @@
       toast(state.stop ? 'Sipariş taraması durduruldu.' : 'Sipariş taraması tamamlandı.');
     } finally {
       state.running = false;
+    updateStats('başlatıldı');
+
+    try {
+      const tabId = await getActiveTabId();
+      const statuses = status === 'all' ? STATUSES : [status];
+      for (const st of statuses) {
+        if (state.stop) break;
+        await scanStatus(tabId, st, maxPage);
+      }
+      updateStats(state.stop ? 'durduruldu' : 'tamamlandı');
+      toast(state.stop ? 'Sipariş taraması durduruldu.' : 'Sipariş taraması tamamlandı.');
+    } finally {
+      state.running = false;
+    state.running = true;
+    getSpeedFactor();
+    updateStats('başlatıldı');
+
+    const tabId = await getActiveTabId();
+    const statuses = status === 'all' ? STATUSES : [status];
+    for (const st of statuses) {
+      if (state.stop) break;
+      await scanStatus(tabId, st, maxPages || 1);
     }
   }
 
@@ -237,6 +365,7 @@
     updateStats('durduruluyor');
   }
 
+  function stopScan() { state.stop = true; }
   function clearTable() {
     if (!confirm('Sipariş tablosu ve state temizlensin mi?')) return;
     state.rows = [];
@@ -310,6 +439,28 @@
       try {
         const status = ui.selStatus?.value || 'all';
         const maxPages = parseMaxPage();
+      try {
+        const status = ui.selStatus?.value || 'all';
+        const maxPages = parseMaxPage();
+    if (ui.inpSpeed) {
+      ui.inpSpeed.value = String(state.speed);
+      ui.inpSpeed.addEventListener('change', () => {
+        try {
+          getSpeedFactor();
+          updateStats('hız güncellendi');
+        } catch (e) {
+          toast(String(e.message || e));
+          ui.inpSpeed.value = '3';
+          state.speed = 3;
+          updateStats('hız varsayılanlandı');
+        }
+      });
+    }
+
+    byId('btnSiparisStart')?.addEventListener('click', async () => {
+      try {
+        const status = ui.selStatus?.value || 'all';
+        const maxPages = Number(ui.inpMaxPage?.value || 1);
         await startScan({ status, maxPages });
       } catch (e) {
         toast(`Sipariş tarama hatası: ${String(e?.message || e)}`);
@@ -324,6 +475,24 @@
 
     updateStats();
   }
+
+    bindOnce(byId('btnSiparisStop'), 'click', 'btnSiparisStop', () => stopScan());
+    bindOnce(byId('btnSiparisClear'), 'click', 'btnSiparisClear', () => clearTable());
+    bindOnce(byId('btnSiparisCopyMd'), 'click', 'btnSiparisCopyMd', () => copyTableMarkdown());
+    bindOnce(byId('btnSiparisExportJson'), 'click', 'btnSiparisExportJson', () => exportJson());
+    bindOnce(byId('btnSiparisExportCsv'), 'click', 'btnSiparisExportCsv', () => exportCsv());
+
+    updateStats();
+  }
+    byId('btnSiparisStop')?.addEventListener('click', () => stopScan());
+    byId('btnSiparisClear')?.addEventListener('click', () => clearTable());
+    byId('btnSiparisCopyMd')?.addEventListener('click', () => copyTableMarkdown());
+    byId('btnSiparisExportJson')?.addEventListener('click', () => exportJson());
+    byId('btnSiparisExportCsv')?.addEventListener('click', () => exportCsv());
+    updateStats();
+  }
+
+  const Siparis = { init: bind, startScan, stopScan, clearTable, copyTableMarkdown, exportJson, exportCsv };
 
   const Siparis = { init: bind, startScan, stopScan, clearTable, copyTableMarkdown, exportJson, exportCsv, buildPageUrl, speedDelayMs, hashRow };
   window.Patpat = window.Patpat || {};
