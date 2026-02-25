@@ -1024,6 +1024,10 @@
       title: 'Müşteri Şikayet Yönetimi',
       desc: 'Şikayetleri sınıflandır, SLA takip et ve yanıt taslakları üret.'
     },
+    'tab-sikayet-siparis': {
+      title: 'Şikayet Sipariş',
+      desc: 'Şikayet sipariş akışını ayrı panelde görüntüleyip yönet.'
+    },
     rules: {
       title: 'Kurallar ve Öğrenme Merkezi',
       desc: 'Öğrenme kuyruğunu yönet, test et ve kalıcı kuralları düzenle.'
