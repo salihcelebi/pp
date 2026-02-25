@@ -28,6 +28,7 @@
   const ui = {};
   const byId = (id) => document.getElementById(id);
   const toast = (m) => window.__PatpatUI?.UI?.toast?.(m) || alert(m);
+  const log = (level, msg) => window.__PatpatUI?.UI?.log?.(level, msg) || console[level === 'Hata' ? 'error' : 'log'](msg);
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   function bindOnce(el, ev, key, fn){ if(!el) return; const k=`${key}:${ev}`; if(BOUND.has(k)) return; BOUND.add(k); el.addEventListener(ev, fn); }

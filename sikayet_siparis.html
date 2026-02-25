@@ -1,0 +1,489 @@
+<!-- =========================================================================
+     KOD ADI: sikayet_siparis.html
+     Amaç: sikayet_siparis.js dosyasını “sidepanel” içinde gelişmiş UI ile yönetmek
+     Not: Body mutlaka data-page="sidepanel" olmalı (JS buna bakıyor).
+     ====================================================================== -->
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Şikayet & Sipariş Paneli</title>
+
+  <style>
+    :root{
+      --bg:#0b1020;
+      --bg2:#0f1730;
+      --card:#101a36;
+      --card2:#0f1833;
+      --text:#e9eeff;
+      --muted:rgba(233,238,255,.72);
+      --muted2:rgba(233,238,255,.55);
+      --line:rgba(255,255,255,.10);
+      --line2:rgba(255,255,255,.14);
+      --good:#2ee59d;
+      --warn:#ffc857;
+      --bad:#ff5d5d;
+      --info:#6aa7ff;
+      --shadow: 0 12px 34px rgba(0,0,0,.35);
+      --radius:16px;
+      --radius2:12px;
+      --gap:12px;
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      font-family:var(--font);
+      background: radial-gradient(1200px 600px at 20% 0%, rgba(106,167,255,.18), transparent 60%),
+                  radial-gradient(900px 500px at 100% 0%, rgba(46,229,157,.12), transparent 55%),
+                  linear-gradient(180deg, var(--bg), var(--bg2));
+      color:var(--text);
+      overflow:hidden;
+    }
+
+    /* Sidepanel root */
+    .app{
+      height:100%;
+      display:flex;
+      flex-direction:column;
+      gap: var(--gap);
+      padding:14px;
+    }
+
+    /* Header */
+    .header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:12px 14px;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background: linear-gradient(180deg, rgba(16,26,54,.80), rgba(16,26,54,.55));
+      box-shadow: var(--shadow);
+    }
+    .titleWrap{ display:flex; align-items:center; gap:12px; min-width:0; }
+    .logo{
+      width:36px; height:36px; border-radius:12px;
+      background: linear-gradient(135deg, rgba(106,167,255,.9), rgba(46,229,157,.85));
+      display:grid; place-items:center;
+      box-shadow: 0 10px 24px rgba(0,0,0,.35);
+      flex:0 0 auto;
+      user-select:none;
+    }
+    .logo span{ font-weight:900; color:#0b1020; letter-spacing:.5px; }
+    .titles{ min-width:0; }
+    .titles h1{
+      margin:0;
+      font-size:14px;
+      line-height:1.2;
+      letter-spacing:.2px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .titles p{
+      margin:4px 0 0;
+      font-size:12px;
+      color:var(--muted);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .headerRight{
+      display:flex; align-items:center; gap:10px; flex:0 0 auto;
+    }
+    .pill{
+      font-size:12px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      color:var(--muted);
+      background: rgba(255,255,255,.03);
+      user-select:none;
+      white-space:nowrap;
+    }
+    #complaintStats{ color:var(--text); border-color:var(--line2); }
+
+    /* Controls */
+    .controls{
+      display:grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: var(--gap);
+      min-height: 118px;
+    }
+
+    .panel{
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background: linear-gradient(180deg, rgba(16,26,54,.72), rgba(16,26,54,.45));
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .panelHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      border-bottom:1px solid var(--line);
+      background: rgba(255,255,255,.02);
+    }
+    .panelHeader h2{
+      margin:0;
+      font-size:12px;
+      letter-spacing:.18px;
+      color:var(--muted);
+      font-weight:700;
+      text-transform:uppercase;
+    }
+    .panelBody{
+      padding:12px;
+    }
+
+    .grid2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      min-width:0;
+    }
+    .label{
+      font-size:11px;
+      color:var(--muted2);
+      letter-spacing:.2px;
+    }
+    .row{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      min-width:0;
+    }
+
+    input[type="text"], input[type="number"], textarea{
+      width:100%;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.18);
+      color: var(--text);
+      padding:10px 10px;
+      outline:none;
+      font-size:13px;
+    }
+    input[type="number"]{ padding-right:8px; }
+    input::placeholder, textarea::placeholder{ color: rgba(233,238,255,.40); }
+
+    input[type="range"]{
+      width:100%;
+      accent-color: var(--info);
+    }
+
+    .btnRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      align-items:center;
+    }
+
+    .btn{
+      border-radius:12px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.05);
+      color: var(--text);
+      padding:10px 12px;
+      font-size:12px;
+      font-weight:700;
+      letter-spacing:.15px;
+      cursor:pointer;
+      transition: transform .05s ease, background .12s ease, border-color .12s ease;
+      user-select:none;
+    }
+    .btn:active{ transform: translateY(1px); }
+    .btn:hover{ background: rgba(255,255,255,.08); border-color: var(--line2); }
+    .btn.primary{ background: rgba(106,167,255,.20); border-color: rgba(106,167,255,.35); }
+    .btn.danger{ background: rgba(255,93,93,.14); border-color: rgba(255,93,93,.32); }
+    .btn.good{ background: rgba(46,229,157,.14); border-color: rgba(46,229,157,.32); }
+    .btn.warn{ background: rgba(255,200,87,.14); border-color: rgba(255,200,87,.32); }
+
+    .hint{
+      font-size:12px;
+      color: var(--muted);
+      line-height:1.35;
+      margin-top:8px;
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px dashed var(--line);
+      background: rgba(255,255,255,.03);
+    }
+
+    /* Main layout */
+    .main{
+      flex:1 1 auto;
+      min-height:0;
+      display:grid;
+      grid-template-columns: 0.95fr 1.25fr;
+      gap: var(--gap);
+    }
+
+    .listWrap, .detailWrap{
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+    }
+
+    .scroll{
+      overflow:auto;
+      padding: 10px;
+    }
+
+    /* List items created by JS: .fileitem + .active */
+    .fileitem{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 10px;
+      border-radius:12px;
+      background: rgba(0,0,0,.15);
+      cursor:pointer;
+      transition: background .12s ease, border-color .12s ease;
+      user-select:none;
+    }
+    .fileitem:hover{
+      background: rgba(0,0,0,.22);
+    }
+    .fileitem span{
+      font-size:12px;
+      color: var(--text);
+      opacity:.95;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .fileitem.active{
+      outline: 2px solid rgba(106,167,255,.45);
+      background: rgba(106,167,255,.10);
+    }
+    .empty{
+      padding:14px;
+      font-size:12px;
+      color: var(--muted);
+      border:1px dashed var(--line);
+      border-radius:12px;
+      background: rgba(255,255,255,.03);
+    }
+
+    /* Detail area: JS fills innerHTML */
+    #complaintDetail a{
+      color: var(--info);
+      text-decoration:none;
+      word-break:break-all;
+    }
+    #complaintDetail a:hover{ text-decoration:underline; }
+
+    /* Draft */
+    .draftArea{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      min-height:0;
+    }
+    textarea{
+      min-height: 140px;
+      resize: vertical;
+      line-height:1.35;
+      font-size:13px;
+    }
+
+    /* Footer */
+    .footer{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background: rgba(255,255,255,.03);
+      color: var(--muted);
+      font-size:11px;
+      box-shadow: var(--shadow);
+    }
+    .kbd{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono";
+      padding:2px 6px;
+      border-radius:8px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.18);
+      color: var(--text);
+      font-size:11px;
+    }
+
+    /* Responsive */
+    @media (max-width: 820px){
+      .controls{ grid-template-columns: 1fr; }
+      .main{ grid-template-columns: 1fr; }
+      textarea{ min-height: 160px; }
+    }
+  </style>
+</head>
+
+<!-- JS “sidepanel” kontrolü yaptığı için bu şart -->
+<body data-page="sidepanel">
+  <div class="app">
+    <!-- Header -->
+    <div class="header">
+      <div class="titleWrap">
+        <div class="logo" aria-hidden="true"><span>ŞS</span></div>
+        <div class="titles">
+          <h1>Şikayet & Sipariş Yönetim Paneli</h1>
+          <p>Hesap.com.tr tarama • Mesaj akışı • Anabayınız kontrol • Çözüm bildir</p>
+        </div>
+      </div>
+      <div class="headerRight">
+        <div class="pill" title="Base URL sabittir">Base: hesap.com.tr</div>
+        <div class="pill" id="complaintStats">Kayıt: 0 • SLA Risk: 0</div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <!-- Left: Scan + Filters -->
+      <div class="panel">
+        <div class="panelHeader">
+          <h2>Tarama Ayarları</h2>
+          <div class="pill" title="URL biçimi: /p/sattigim-ilanlar?page=N">…?page=N</div>
+        </div>
+        <div class="panelBody">
+          <div class="grid2">
+            <div class="field">
+              <div class="label">Kaç sayfa taransın?</div>
+              <input id="inpComplaintPages" type="number" min="1" max="200" value="5" />
+            </div>
+            <div class="field">
+              <div class="label">Tarama hızı (1 yavaş • 10 hızlı)</div>
+              <input id="rngComplaintSpeed" type="range" min="1" max="10" value="5" />
+            </div>
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div class="field">
+            <div class="label">Arama (SMM / kullanıcı / durum / platform / servis)</div>
+            <input id="inpComplaintSearch" type="text" placeholder="örn: 7410554, tiktok, tamamlandı, iade..." />
+          </div>
+
+          <div style="height:12px"></div>
+
+          <div class="btnRow">
+            <button class="btn primary" id="btnComplaintScan">Taramayı Başlat</button>
+            <button class="btn danger" id="btnComplaintStop">Durdur</button>
+            <button class="btn" id="btnComplaintSolution">Çözüm Öner</button>
+            <button class="btn warn" id="btnComplaintEscalate">Eskale</button>
+            <button class="btn danger" id="btnComplaintClose">Kapat</button>
+          </div>
+
+          <div class="hint">
+            <b>İpucu:</b> Base URL sabit: <span class="kbd">https://hesap.com.tr/p/sattigim-ilanlar</span><br/>
+            Taramada otomatik: <span class="kbd">?page=1</span>, <span class="kbd">?page=2</span> ...
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Actions -->
+      <div class="panel">
+        <div class="panelHeader">
+          <h2>Operasyon Araçları</h2>
+          <div class="pill" title="Seçili kayıt üzerinden çalışır">Seçili kayıt</div>
+        </div>
+        <div class="panelBody">
+          <div class="btnRow">
+            <button class="btn good" id="btnComplaintDraft">Taslak Üret</button>
+            <button class="btn" id="btnComplaintCopyDraft">Taslağı Kopyala</button>
+            <button class="btn primary" id="btnComplaintOpenMessage">Mesaj Akışını Aç</button>
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div class="btnRow">
+            <!-- Bu iki buton JS içinde bind edildi (varsa) -->
+            <button class="btn primary" id="btnComplaintAnabayiCheck">Anabayınız Kontrol + Cevap</button>
+            <button class="btn warn" id="btnComplaintCozumBildir">Çözüm Bildir (Hesap)</button>
+          </div>
+
+          <div class="hint" id="complaintActionHint">
+            Servis ID gizleme kontrolü: —
+          </div>
+
+          <div class="hint">
+            <b>Kısayol önerisi:</b> Tarama sonrası soldan seç → taslak üret → mesaj akışı → çözüm bildir.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+      <!-- List -->
+      <div class="panel listWrap">
+        <div class="panelHeader">
+          <h2>Şikayet Kayıtları</h2>
+          <div class="pill" title="Listeden tıklayıp detay aç">Sol liste</div>
+        </div>
+        <div class="scroll" id="complaintsList">
+          <div class="empty">Henüz kayıt yok. “Taramayı Başlat” ile başla.</div>
+        </div>
+      </div>
+
+      <!-- Detail + Draft -->
+      <div class="panel detailWrap">
+        <div class="panelHeader">
+          <h2>Detay & Taslak</h2>
+          <div class="pill" title="Detaylar sağ panelde görünür">Sağ panel</div>
+        </div>
+        <div class="panelBody draftArea" style="min-height:0">
+          <div class="panel" style="border-radius:14px; border-color: var(--line); background: rgba(0,0,0,.10); box-shadow:none;">
+            <div class="panelHeader" style="border-bottom-color: var(--line);">
+              <h2>Detay</h2>
+              <div class="pill">Linkler tıklanabilir</div>
+            </div>
+            <div class="scroll" id="complaintDetail" style="max-height: 250px;">
+              <div class="empty">Detay görmek için soldan kayıt seçin.</div>
+            </div>
+          </div>
+
+          <div class="panel" style="border-radius:14px; border-color: var(--line); background: rgba(0,0,0,.10); box-shadow:none;">
+            <div class="panelHeader" style="border-bottom-color: var(--line);">
+              <h2>Taslak Mesaj</h2>
+              <div class="pill">Kopyala → Gönder</div>
+            </div>
+            <div class="panelBody">
+              <textarea id="complaintDraftText" placeholder="Taslak burada oluşur..."></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div>
+        <b>Durum:</b> Sidepanel UI hazır • Kayıtlar <span class="kbd">chrome.storage.local</span> içinde saklanır.
+      </div>
+      <div>
+        <span class="kbd">Scan</span> → <span class="kbd">Draft</span> → <span class="kbd">Message</span> → <span class="kbd">Cozum</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- sikayet_siparis.js: Bu HTML’deki ID’lere bağlanır ve tüm akışı yönetir -->
+  <script src="sikayet_siparis.js"></script>
+</body>
+</html>
