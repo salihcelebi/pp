@@ -1,75 +1,436 @@
 (() => {
   if (typeof window === 'undefined') return;
-  if (window.__RAKIP_INIT__) return;
+  if (window.__RAKIP_INIT__) return; // [KANIT@KOD: DURUM/STATE] __RAKIP_INIT__ gate
   window.__RAKIP_INIT__ = true;
   'use strict';
 
-  const BASE_URL = 'https://hesap.com.tr/p';
-  const SOLD_BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar';
-  const BOUND = new Set();
+  const BASE_URL = 'https://hesap.com.tr/p'; // [KANIT@KOD: DIŞ BAĞIMLILIK]
+  const BOUND_EVENTS = new Set();
 
-  const RX_TITLE_15 = [/^([^\n]{10,200})\n(?=[\s\S]*?\bSipariş\s*#\d+)/mi,/^([^\n]{10,200})\n[^\n]{0,200}\n\s*Sipariş\s*#\d+/mi,/(?:^|\n)([^\n]{10,200})\n(?:\1|\s*[^\n]{10,200})\n\s*Sipariş\s*#\d+/mi,/([^\n]{10,200})\s*\n\s*Sipariş\s*#\d+/mi,/([^\n]{10,200})\s*(?=\s*\n\s*\n\s*Sipariş\s*#\d+)/mi,/([^\n]{10,200})\s*\n\s*\n\s*Sipariş\s*#\d+/mi,/([A-ZÇĞİÖŞÜ0-9][^\n]{8,200})\n(?=Sipariş\s*#\d+)/m,/(?:YOUTUBE|TİKTOK|TikTok|Instagram|INSTAGRAM)\b[^\n]{5,200}/m,/^(.*(?:Beğeni|Takipçi|İzlenme|Yorum|Kaydet)[^\n]{0,160})$/mi,/^(.{10,200})$/m,/([^\n]{10,200})(?=\nSMM\s*ID:)/mi,/([^\n]{10,200})(?=\n\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})/mi,/([^\n]{10,200})(?=\n(?:Teslim|İptal|Müşteri|Sorun))/mi,/([^\n]{10,200})(?=\nToplam\s*Tutar)/mi,/([^\n]{10,200})(?=\n[\s\S]*?TL)/mi];
-  const RX_ORDER_15=[/\bSipariş\s*#(\d{5,12})\b/i,/\bSİPARİŞ\s*#(\d{5,12})\b/i,/#\s*(\d{5,12})\b/i,/\bSiparis\s*#(\d{5,12})\b/i,/\bSipariş\s*No[:\s]*#?(\d{5,12})\b/i,/\bSipariş[:\s]*#?(\d{5,12})\b/i,/\bOrder\s*#(\d{5,12})\b/i,/\bSipariş\s*ID[:\s]*#?(\d{5,12})\b/i,/\bSipariş\s*Numarası[:\s]*#?(\d{5,12})\b/i,/\bSipariş\s*-\s*#?(\d{5,12})\b/i,/\bSIPARIS\s*#(\d{5,12})\b/i,/\bSIPARIS[:\s]*#?(\d{5,12})\b/i,/\bSipariş\s*\n\s*#(\d{5,12})\b/i,/(?:^|\n)\s*Sipariş\s*#(\d{5,12})/i,/\b(\d{5,12})\b(?=[\s\S]*?SMM\s*ID:|\s*\n\s*\d{2}\.\d{2}\.\d{4})/i];
-  const RX_SMM_15=[/\bSMM\s*ID:\s*(\d{4,12})\b/i,/\bSMMID:\s*(\d{4,12})\b/i,/\bSMM\s*No[:\s]*(\d{4,12})\b/i,/\bSMM\s*#\s*(\d{4,12})\b/i,/\bID:\s*(\d{4,12})\b(?=[\s\S]*?\d{2}\.\d{2}\.\d{4})/i,/\bSMM\s*Kimlik[:\s]*(\d{4,12})\b/i,/\bSMM\s*Numara[:\s]*(\d{4,12})\b/i,/\bSMM\s*[:\s]*(\d{4,12})\b/i,/(?:^|\n)\s*(\d{4,12})\s*(?=\n\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})/m,/(?:^|\n)\s*SMM\s*\n\s*ID[:\s]*(\d{4,12})/mi,/\bSMM\s*I[D|d]\s*[:\-]\s*(\d{4,12})\b/i,/\bSMM\s*Id\s*[:\-]\s*(\d{4,12})\b/i,/\bSMM\s*IDENTIFIER[:\s]*(\d{4,12})\b/i,/\bSMM\s*CODE[:\s]*(\d{4,12})\b/i,/\b(\d{4,12})\b(?=[\s\S]*?Toplam\s*Tutar)/i];
-  const RX_DATE_15=[/\b(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})\b/,/\b(\d{1,2}\.\d{1,2}\.\d{4}\s+\d{2}:\d{2})\b/,/\b(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})\b/,/\b(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\b/,/\b(\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2})\b/,/(?:^|\n)\s*(\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2})/m,/\b(\d{2}\.\d{2}\.\d{4})\b(?=[\s\S]*?\bTeslim|\bİptal|\bMüşteri|\bSorun)/i,/\b(\d{2}:\d{2})\b(?=[\s\S]*?Toplam\s*Tutar)/i,/\b(\d{2}\.\d{2}\.\d{4}\s+\d{1,2}:\d{2})\b/,/\b(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{1,2})\b/,/(?:^|\n)\s*(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})\s*$/m,/(?:^|\n)\s*(\d{2}\.\d{2}\.\d{4})\s*$/m,/\b(\d{2}\.\d{2}\.\d{4})\b/,/\b(\d{2}\/\d{2}\/\d{4})\b/,/\b(\d{4}-\d{2}-\d{2})\b/];
-  const RX_STATUS_15=[/\bTeslim\s*Edildi\b/i,/\bİptal\s*Edildi\b/i,/\bMüşteriden\s*Onay\s*Bekleniyor\b/i,/\bSorun\s*Bildirildi\b/i,/\bIade\s*Sürecinde\b/i,/\bTeslimat\s*Bekleniyor\b/i,/\bİşlem\s*Sırasında\b/i,/\bBeklemede\b/i,/\bTamamlandı\b/i,/\bBaşarısız\b/i,/\bKısmi\s*Tamamlandı\b/i,/\bGeri\s*Ödeme\b/i,/\bOnay\s*Bekliyor\b/i,/(?:^|\n)([^\n]{3,60})(?=\nToplam\s*Tutar)/mi,/(?:^|\n)\d{2}:\d{2}\n([^\n]{3,60})/mi];
-  const RX_AMOUNT_15=[/\bToplam\s*Tutar\s*\n\s*([\d.,]+\s*TL)\b/i,/\bToplam\s*Tutar\s*([\d.,]+\s*TL)\b/i,/\bTutar\s*\n\s*([\d.,]+\s*TL)\b/i,/\bTutar[:\s]*([\d.,]+\s*TL)\b/i,/\bToplam[:\s]*([\d.,]+\s*TL)\b/i,/\bTotal\s*Amount[:\s]*([\d.,]+\s*TL)\b/i,/\bToplam\s*Ücret[:\s]*([\d.,]+\s*TL)\b/i,/\bÜcret[:\s]*([\d.,]+\s*TL)\b/i,/(?:^|\n)\s*([\d]{1,3}(?:\.[\d]{3})*(?:,[\d]{2})?)\s*TL\b/m,/\b([\d]{1,3}(?:\.[\d]{3})*(?:,[\d]{2})?)\s*TL\b/,/\b([\d]+(?:,[\d]{2})?)\s*TL\b/,/\b([\d]+(?:\.[\d]{3})*(?:,[\d]{2})?)\s*TL\b/,/TL\s*([\d.,]+)/i,/([\d.,]+)\s*(?:₺|TL)\b/i,/(?:Toplam\s*Tutar[\s\S]{0,40})\b([\d.,]+\s*(?:₺|TL))\b/i];
-  const RX_PLATFORM_15=[/\bTik\s*Tok\b/i,/\bTİKTOK\b/i,/\btiktok\b/i,/\bInstagram\b/i,/\bINSTAGRAM\b/i,/\binstagram\b/i,/\bYou\s*Tube\b/i,/\bYouTube\b/i,/\bYOUTUBE\b/i,/\byoutube\b/i,/\bTwitter\b/i,/\bTWITTER\b/i,/\bX\s*\(Twitter\)\b|\bTwitter\s*\(X\)\b/i,/\bFacebook\b/i,/\bTwitch\b/i];
-  const RX_SERVICE_TYPE_15=[/\bTakipçi\b/i,/\bBeğeni\b/i,/\bİzlenme\b/i,/\bYorum\b/i,/\bKaydet\b/i,/\bPaylaş\b/i,/\bAbone\b/i,/\bReels\b/i,/\bHikaye\b/i,/\bCanlı\b/i,/\bJeton\b/i,/\bGörüntülenme\b/i,/\bKeşfet\b/i,/\bAlgoritma\b/i,/\bService\b|\bServis\b/i];
+  const PLATFORM_SERVICE_MAP = Object.freeze({
+    tiktok: ['hesap', 'takipci', 'begeni', 'izlenme', 'yorum'],
+    instagram: ['hesap', 'takipci', 'begeni', 'izlenme', 'yorum'],
+    youtube: ['hesap', 'takipci', 'begeni', 'izlenme', 'yorum'],
+    twitter: ['hesap', 'takipci', 'begeni', 'izlenme', 'yorum']
+  });
 
-  const state={rows:[],hashes:new Set(),dropped:0,running:false,shouldStop:false,pageCounts:{}}; const ui={};
-  const byId=(id)=>document.getElementById(id); const toast=(m)=>window.__PatpatUI?.UI?.toast?.(m)||alert(m); const wait=(ms)=>new Promise((r)=>setTimeout(r,ms));
-  function bindOnce(el,ev,key,fn){ if(!el)return; const k=`${key}:${ev}`; if(BOUND.has(k)) return; BOUND.add(k); el.addEventListener(ev,fn);} function pickFirstMatch(list,text,g=1){ for(const rx of list){ const m=String(text||'').match(rx); if(m) return g===2&&m[2]?`${m[1]} ${m[2]}`:(m[g]||m[0]||''); } return ''; }
-  function splitBlocks(pageText){ return String(pageText||'').split(/(?=Sipariş\s*#\d+)/i).map((x)=>x.trim()).filter(Boolean); }
-  function buildPageUrl(base,page){ return `${base}?page=${page}`; }
-  function speedDelayMs(){ const n=Math.max(1,Math.min(100,Number(ui.inpSpeed?.value||3))); return Math.max(30,Math.round(1600/n)); }
-  async function hashRow(r){ const src=`${r.platform}|${r.ilanBasligi}|${r.hizmet}|${r.magaza}|${r.garanti}|${r.fiyat}|${r.reklam}`; const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(src)); return Array.from(new Uint8Array(d)).map((b)=>b.toString(16).padStart(2,'0')).join(''); }
-  function statusLine(t){ if(ui.statusLine) ui.statusLine.textContent=`Durum: ${t}`; }
-  function updateStats(){ const pages=Object.keys(state.pageCounts).sort((a,b)=>a-b).map((k)=>`p${k}:${state.pageCounts[k]}`).join(' | '); if(ui.stats) ui.stats.textContent=`Toplam bulunan: ${state.rows.length} • Dedup atılan: ${state.dropped} • Sayfa başına: ${pages||'—'}`; if(ui.empty) ui.empty.hidden=state.rows.length>0; }
-  function appendRow(r){ const tr=document.createElement('tr'); tr.innerHTML=`<td>${r.platform||''}</td><td>${r.ilanBasligi||''}</td><td>${r.hizmet||''}</td><td>${r.magaza||''}</td><td>${r.garanti||''}</td><td>${r.fiyat??''}</td><td>${r.reklam||''}</td>`; ui.tblBody?.appendChild(tr); }
+  const state = {
+    rows: [],
+    hashes: new Set(),
+    dropped: 0,
+    shouldStop: false,
+    running: false,
+    pageCounts: {}
+  };
 
-  function parseSoldBlock_RAKIP(block){ const title=pickFirstMatch(RX_TITLE_15,block); return { platform: pickFirstMatch(RX_PLATFORM_15,title), ilanBasligi:title||null, hizmet:pickFirstMatch(RX_SERVICE_TYPE_15,title)||null, magaza:null, garanti:null, fiyat:(()=>{const t=pickFirstMatch(RX_AMOUNT_15,block); return Number(String(t).replace(/\./g,'').replace(',', '.').replace(/[^\d.]/g,''))||null;})(), reklam:pickFirstMatch(RX_STATUS_15,block)||null, orderNo:pickFirstMatch(RX_ORDER_15,block), smmId:pickFirstMatch(RX_SMM_15,block), dateTime:pickFirstMatch(RX_DATE_15,block), amountTl:pickFirstMatch(RX_AMOUNT_15,block), status:pickFirstMatch(RX_STATUS_15,block) };
+  const ui = {};
+
+  const byId = (id) => document.getElementById(id);
+  const toast = (m) => window.__PatpatUI?.UI?.toast?.(m) || alert(m);
+  const log = (level, msg) => window.__PatpatUI?.UI?.log?.(level, msg) || console[level === 'Hata' ? 'error' : 'log'](msg);
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const nSpace = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+
+  function bindOnce(el, event, key, fn) {
+    if (!el) return;
+    const token = `${key}:${event}`;
+    if (BOUND_EVENTS.has(token)) return;
+    BOUND_EVENTS.add(token);
+    el.addEventListener(event, fn);
   }
 
-  async function getActiveTabId(){ const [tab]=await chrome.tabs.query({active:true,lastFocusedWindow:true}); if(!tab?.id) throw new Error('Aktif sekme yok'); return tab.id; }
-  async function navigate(tabId,url){ await chrome.tabs.update(tabId,{url}); await new Promise((res)=>{ const l=(id,info)=>{ if(id===tabId&&info.status==='complete'){ chrome.tabs.onUpdated.removeListener(l); res(true);} }; chrome.tabs.onUpdated.addListener(l);}); await wait(speedDelayMs()); }
-  async function pageText(tabId){ const [{result}] = await chrome.scripting.executeScript({target:{tabId},func:()=>String(document.body.innerText||'')}); return String(result||''); }
+  function renderServiceOptions() {
+    if (!ui.selService || !ui.selPlatform) return;
+    const p = ui.selPlatform.value;
+    const list = p === 'hepsi'
+      ? ['hepsi', ...new Set(Object.values(PLATFORM_SERVICE_MAP).flat())]
+      : (PLATFORM_SERVICE_MAP[p] || []);
+    const options = (p ? list : []).length ? list : [];
+    if (!options.length) {
+      ui.selService.innerHTML = '<option value="">Önce platform seç</option>';
+      ui.selService.disabled = true;
+      return;
+    }
+    ui.selService.disabled = false;
+    ui.selService.innerHTML = options.map((x) => `<option value="${x}">${x}</option>`).join('');
+  }
 
-  async function startScan(){
-    if(state.running) return;
-    const platform=String(ui.selPlatform?.value||'').trim(); if(!platform) return toast('Önce platform seç');
-    const minTxt=String(ui.inpQtyMin?.value||'').trim(); const maxTxt=String(ui.inpQtyMax?.value||'').trim(); const min=minTxt?Number(minTxt):null; const max=maxTxt?Number(maxTxt):null; if((minTxt&&(!Number.isFinite(min)||min<0))||(maxTxt&&(!Number.isFinite(max)||max<0))||(min!=null&&max!=null&&min>max)) return toast('Min/Max adet geçersiz');
-    const maxPage=Math.max(1,Number(ui.inpPage?.value||1));
-    state.running=true; state.shouldStop=false; state.pageCounts={}; statusLine('çalışıyor');
-    const tabId=await getActiveTabId();
-    for(let page=1; page<=maxPage; page++){
-      if(state.shouldStop) break;
-      const soldMode = true;
-      const url = soldMode ? buildPageUrl(SOLD_BASE_URL,page) : buildPageUrl(`${BASE_URL}/${platform}`,page);
-      try {
-        await navigate(tabId,url);
-        const blocks = splitBlocks(await pageText(tabId));
-        state.pageCounts[page] = blocks.length;
-        if(blocks.length<40){ console.warn('selector/parse bozuldu olabilir',url,blocks.length,String((await pageText(tabId))).slice(0,2048)); toast('selector/parse bozuldu olabilir'); }
-        if(!blocks.length){ console.warn('site DOM değişti',url,String((await pageText(tabId))).slice(0,2048)); }
-        for(let i=0;i<blocks.length;i++){
-          if(state.shouldStop) break;
-          try{ const row=parseSoldBlock_RAKIP(blocks[i]); const h=await hashRow(row); if(state.hashes.has(h)){state.dropped++; continue;} state.hashes.add(h); state.rows.push(row); appendRow(row);}catch(e){ console.error(`listing parse page=${page} idx=${i} selector=block`,e); }
+  function parseNumericOptional(v, label) {
+    const s = String(v || '').trim();
+    if (!s) return null;
+    const n = Number(s.replace(',', '.'));
+    if (!Number.isFinite(n) || n < 0) throw new Error(`${label} sayısal olmalıdır.`);
+    return n;
+  }
+
+  function parseSpeed() {
+    const raw = Number(ui.inpSpeed?.value || 3);
+    if (!Number.isFinite(raw)) throw new Error('Tarama hızı sayısal olmalıdır.');
+    const c = Math.max(1, Math.min(100, raw));
+    if (ui.inpSpeed) ui.inpSpeed.value = String(c);
+    return c;
+  }
+
+  function speedDelayMs(speed) {
+    const s = Math.max(1, Math.min(100, Number(speed || 3)));
+    return Math.max(30, Math.round(1600 / s));
+  }
+
+  // [KANIT@KOD: DÖNÜŞÜM] buildPageUrl
+  function buildPageUrl(baseUrl, page) {
+    return `${baseUrl}?page=${page}`;
+  }
+
+  function updateStatus(statusText) {
+    if (ui.statusLine) ui.statusLine.textContent = `Durum: ${statusText}`;
+  }
+
+  function updateStats() {
+    const pages = Object.keys(state.pageCounts).sort((a, b) => Number(a) - Number(b)).map((k) => `p${k}:${state.pageCounts[k]}`).join(' | ');
+    if (ui.stats) ui.stats.textContent = `Toplam bulunan: ${state.rows.length} • Dedup atılan: ${state.dropped} • Sayfa başına: ${pages || '—'}`;
+    if (ui.empty) ui.empty.hidden = state.rows.length > 0;
+  }
+
+  async function hashRow(row) {
+    const src = `${row.platform}|${row.ilanBasligi}|${row.hizmet}|${row.magaza}|${row.garanti}|${row.fiyat}|${row.reklam}`;
+    const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(src));
+    return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function appendRow(row) {
+    if (!ui.tblBody) return;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.platform || ''}</td><td>${row.ilanBasligi || ''}</td><td>${row.hizmet || ''}</td><td>${row.magaza || ''}</td><td>${row.garanti || ''}</td><td>${row.fiyat ?? ''}</td><td>${row.reklam || ''}</td>`;
+    ui.tblBody.appendChild(tr);
+  }
+
+  async function getActiveTabId() {
+    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    if (!tab?.id) throw new Error('Aktif sekme bulunamadı.');
+    return tab.id;
+  }
+
+  async function gotoAndWait(tabId, url, speed) {
+    await chrome.tabs.update(tabId, { url });
+    await new Promise((resolve) => {
+      const listener = (id, info) => {
+        if (id === tabId && info.status === 'complete') {
+          chrome.tabs.onUpdated.removeListener(listener);
+          resolve(true);
         }
-      } catch(e){ console.error('page fetch/parse',url,e); }
+      };
+      chrome.tabs.onUpdated.addListener(listener);
+    });
+    await wait(speedDelayMs(speed));
+  }
+
+  async function extractPage(tabId, platformHint, serviceHint) {
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId },
+      args: [platformHint, serviceHint],
+      func: async (platform, service) => {
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        const clean = (v) => String(v || '').replace(/\s+/g, ' ').trim();
+        const rows = [];
+
+        // [KANIT@KOD: DÖNGÜ/BİTİRME] scroll+rescan N
+        const step = Math.floor(window.innerHeight * 0.9);
+        for (let round = 0; round < 3; round++) {
+          for (let y = 0; y < document.body.scrollHeight; y += step) {
+            window.scrollTo({ top: y, behavior: 'auto' });
+            await sleep(140);
+          }
+          await sleep(220);
+        }
+
+        const cards = Array.from(document.querySelectorAll('article, .card, .list-group-item, [class*="ilan"], [class*="listing"]'));
+        for (let i = 0; i < cards.length; i++) {
+          const c = cards[i];
+          try {
+            const txt = String(c.innerText || '').trim();
+            if (!txt) continue;
+            const firstLine = clean(txt.split('\n')[0] || '') || null;
+            const serviceHit = (txt.match(/(Takipçi|İzlenme|Beğeni|Yorum|Kaydet|Paylaş|Hesap)/i) || [, ''])[1] || null;
+            const shopHit = (txt.match(/Mağaza\s*:?\s*([^\n]+)/i) || [, ''])[1] || null;
+            const warrantyHit = (txt.match(/Garanti\s*:?\s*([^\n]+)/i) || [, ''])[1] || null;
+            const priceHit = (txt.match(/([\d.,]+)\s*TL/i) || [, ''])[1] || null;
+            const adHit = (txt.match(/(ÇOK SATAN|%\s*\d{1,3})/i) || [, ''])[1] || null;
+
+            rows.push({
+              platform: platform || null,
+              ilanBasligi: firstLine,
+              hizmet: serviceHit || service || null,
+              magaza: clean(shopHit),
+              garanti: clean(warrantyHit),
+              fiyat: priceHit ? Number(String(priceHit).replace(/\./g, '').replace(',', '.')) : null,
+              reklam: clean(adHit),
+              _index: i
+            });
+          } catch (e) {
+            rows.push({ _error: String(e?.message || e), _index: i, platform: platform || null, ilanBasligi: null, hizmet: service || null, magaza: null, garanti: null, fiyat: null, reklam: null });
+          }
+        }
+
+        return {
+          rows,
+          itemCount: rows.length,
+          snippet: String(document.documentElement?.outerHTML || '').slice(0, 2048)
+        };
+      }
+    });
+    return result || { rows: [], itemCount: 0, snippet: '' };
+  }
+
+  function selectedCombos() {
+    const p = ui.selPlatform?.value || '';
+    const s = ui.selService?.value || '';
+
+    if (!p) throw new Error('Önce platform seçmelisin.');
+
+    const platforms = p === 'hepsi' ? Object.keys(PLATFORM_SERVICE_MAP) : [p];
+    const out = [];
+    for (const pl of platforms) {
+      const services = PLATFORM_SERVICE_MAP[pl] || [];
+      if (s && s !== 'hepsi') {
+        out.push({ platform: pl, hizmet: s });
+      } else {
+        for (const sv of services) out.push({ platform: pl, hizmet: sv });
+      }
+    }
+    return out;
+  }
+
+  function validateFilters() {
+    const min = parseNumericOptional(ui.inpQtyMin?.value, 'Min adet');
+    const max = parseNumericOptional(ui.inpQtyMax?.value, 'Max adet');
+    if (min != null && max != null && min > max) {
+      throw new Error('Min adet, Max adetten büyük olamaz.');
+    }
+    const maxPage = Number(ui.inpPage?.value || 1);
+    if (!Number.isFinite(maxPage) || maxPage < 1) throw new Error('Sayfa sayısı en az 1 olmalıdır.');
+    return { min, max, maxPage: Math.floor(maxPage) };
+  }
+
+  function applyQtyFilter(row, min, max) {
+    const num = Number(row.ilanBasligi?.match(/\b(\d{1,6})\b/)?.[1] || NaN);
+    if (min != null && Number.isFinite(num) && num < min) return false;
+    if (max != null && Number.isFinite(num) && num > max) return false;
+    return true;
+  }
+
+  function setUiRunning(running) {
+    state.running = running;
+    if (ui.btnStart) ui.btnStart.disabled = running;
+    if (ui.btnStop) ui.btnStop.disabled = !running;
+    updateStatus(running ? 'çalışıyor' : (state.shouldStop ? 'durdu' : 'hazır'));
+  }
+
+  async function startScan() {
+    if (state.running) return toast('Rakip tarama zaten çalışıyor.');
+
+    const { min, max, maxPage } = validateFilters();
+    const speed = parseSpeed();
+    const combos = selectedCombos();
+
+    state.shouldStop = false;
+    setUiRunning(true);
+
+    const tabId = await getActiveTabId();
+    state.pageCounts = {};
+
+    try {
+      for (const combo of combos) {
+        if (state.shouldStop) break;
+
+        for (let page = 1; page <= maxPage; page++) {
+          if (state.shouldStop) break; // [KANIT@KOD: KOŞUL/FİLTRE]
+
+          const listingBase = `${BASE_URL}/${combo.platform}/${combo.hizmet}`;
+          const pageUrl = buildPageUrl(listingBase, page);
+
+          try {
+            await gotoAndWait(tabId, pageUrl, speed);
+            const ext = await extractPage(tabId, combo.platform, combo.hizmet);
+            state.pageCounts[page] = (state.pageCounts[page] || 0) + Number(ext.itemCount || 0);
+
+            if (Number(ext.itemCount || 0) < 40) {
+              log('Uyarı', `selector/parse bozuldu olabilir page=${page} url=${pageUrl} count=${ext.itemCount}`);
+              log('Uyarı', `HTML snippet(2KB): ${ext.snippet || ''}`);
+              toast('Sayfada ilan sayısı düşük görünüyor. Selector/DOM drift olabilir.');
+            }
+
+            if (!ext.rows.length) {
+              log('Uyarı', `Site DOM değişti olabilir. url=${pageUrl}`);
+              log('Uyarı', `HTML snippet(2KB): ${ext.snippet || ''}`);
+            }
+
+            for (let i = 0; i < ext.rows.length; i++) {
+              if (state.shouldStop) break;
+              const raw = ext.rows[i];
+              try {
+                if (raw._error) throw new Error(raw._error);
+
+                const row = {
+                  platform: raw.platform ?? null,
+                  ilanBasligi: nSpace(raw.ilanBasligi) || null,
+                  hizmet: nSpace(raw.hizmet) || null,
+                  magaza: nSpace(raw.magaza) || null,
+                  garanti: nSpace(raw.garanti) || null,
+                  fiyat: Number.isFinite(raw.fiyat) ? raw.fiyat : null,
+                  reklam: nSpace(raw.reklam) || null
+                };
+
+                if (!applyQtyFilter(row, min, max)) continue;
+
+                const h = await hashRow(row);
+                if (state.hashes.has(h)) { state.dropped += 1; continue; }
+                state.hashes.add(h);
+                state.rows.push(row);
+                appendRow(row);
+              } catch (e) {
+                log('Hata', `İlan parse hatası page=${page} idx=${i} selector=listing-card: ${String(e?.message || e)}`);
+              }
+            }
+          } catch (e) {
+            log('Hata', `Sayfa fetch/parse hatası url=${pageUrl}: ${String(e?.message || e)}`);
+          }
+
+          updateStats();
+          await wait(speedDelayMs(speed));
+        }
+      }
+    } finally {
+      setUiRunning(false);
       updateStats();
     }
-    state.running=false; statusLine(state.shouldStop?'durdu':'hazır');
   }
 
-  function stop(){ state.shouldStop=true; statusLine('durduruluyor'); }
-  function clear(){ state.rows=[]; state.hashes.clear(); state.dropped=0; state.pageCounts={}; if(ui.tblBody) ui.tblBody.innerHTML=''; updateStats(); statusLine('hazır'); }
-  function dl(n,t,m){ const b=new Blob([t],{type:m}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u;a.download=n;a.click(); setTimeout(()=>URL.revokeObjectURL(u),1000);} function exportJson(){dl(`rakip_${Date.now()}.json`,JSON.stringify(state.rows,null,2),'application/json');} function exportCsv(){const cols=['platform','ilanBasligi','hizmet','magaza','garanti','fiyat','reklam']; const esc=(v)=>`"${String(v??'').replace(/"/g,'""')}"`; const lines=[cols.join(',')].concat(state.rows.map((r)=>cols.map((k)=>esc(r[k])).join(','))); dl(`rakip_${Date.now()}.csv`,'\ufeff'+lines.join('\n'),'text/csv;charset=utf-8');}
-  function testRegex(){ try{ const t=String(ui.regexInput?.value||'').trim(); if(!t){ if(ui.regexPreview) ui.regexPreview.textContent='Regex boş'; return; } const rx=new RegExp(t,'i'); const s=state.rows[0]?.ilanBasligi||'örnek'; if(ui.regexPreview) ui.regexPreview.textContent=rx.test(s)?'Regex eşleşti':'Regex eşleşmedi'; }catch(e){ if(ui.regexPreview) ui.regexPreview.textContent=`Regex hatası: ${String(e?.message||e)}`; toast('Geçersiz regex'); }}
-  function toggleFullscreen(){ (byId('rakipRoot')||document.body).classList.toggle('rakip-fullscreen'); }
+  function stopScan() {
+    state.shouldStop = true;
+    updateStatus('durduruluyor');
+  }
 
-  function bind(){ ui.selPlatform=byId('selPlatform'); ui.inpQtyMin=byId('inpQtyMin'); ui.inpQtyMax=byId('inpQtyMax'); ui.inpPage=byId('inpRakipPageCount'); ui.inpSpeed=byId('inpScanSpeed'); ui.tblBody=byId('tblRakipBody'); ui.stats=byId('rakipStats'); ui.empty=byId('marketEmpty'); ui.statusLine=byId('rakipStatusLine'); ui.regexInput=byId('inpRakipRegex'); ui.regexPreview=byId('rakipRegexPreview');
-    bindOnce(byId('btnRakipStart'),'click','start',()=>startScan().catch((e)=>toast(String(e?.message||e)))); bindOnce(byId('btnRakipStop'),'click','stop',stop); bindOnce(byId('btnRakipClear'),'click','clear',clear); bindOnce(byId('btnRakipCopyMd'),'click','md',()=>{}); bindOnce(byId('btnRakipExportJson'),'click','json',exportJson); bindOnce(byId('btnRakipExportCsv'),'click','csv',exportCsv); bindOnce(byId('btnRakipRegexTest'),'click','regex',testRegex); bindOnce(byId('btnRakipRegexPanel'),'click','regex2',testRegex); bindOnce(byId('btnRakipFullscreen'),'click','full',toggleFullscreen); updateStats(); statusLine('hazır'); }
+  function clearTable() {
+    if (!confirm('Rakip tablo ve sayaçlar temizlensin mi?')) return;
+    state.rows = [];
+    state.hashes.clear();
+    state.dropped = 0;
+    state.pageCounts = {};
+    if (ui.tblBody) ui.tblBody.innerHTML = '';
+    updateStats();
+    updateStatus('hazır');
+  }
 
-  const Rakip={init:bind,startScan,stopScan:stop,clearTable:clear,exportJson,exportCsv,buildPageUrl,hashRow,speedDelayMs}; window.Patpat=window.Patpat||{}; window.Patpat.Rakip=Rakip; if(document.body?.dataset?.page==='sidepanel'||byId('btnRakipStart')) Rakip.init();
+  async function copyTableMarkdown() {
+    const head = '| Platform | İlan Başlığı | Hizmet | Mağaza | Garanti | Fiyat | Reklam |\n|---|---|---|---|---|---:|---|';
+    const body = state.rows.map((r) => `| ${r.platform ?? ''} | ${r.ilanBasligi ?? ''} | ${r.hizmet ?? ''} | ${r.magaza ?? ''} | ${r.garanti ?? ''} | ${r.fiyat ?? ''} | ${r.reklam ?? ''} |`).join('\n');
+    try { await navigator.clipboard.writeText(`${head}\n${body}`); toast('Markdown kopyalandı.'); }
+    catch { toast('Panoya kopyalama başarısız.'); }
+  }
+
+  function dl(name, text, mime) {
+    const blob = new Blob([text], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportJson() { dl(`rakip_${Date.now()}.json`, JSON.stringify(state.rows, null, 2), 'application/json'); }
+
+  function exportCsv() {
+    const cols = ['platform', 'ilanBasligi', 'hizmet', 'magaza', 'garanti', 'fiyat', 'reklam'];
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [cols.join(',')].concat(state.rows.map((r) => cols.map((k) => esc(r[k])).join(',')));
+    dl(`rakip_${Date.now()}.csv`, '\ufeff' + lines.join('\n'), 'text/csv;charset=utf-8');
+  }
+
+  function validateRegexInput() {
+    const txt = String(ui.regexInput?.value || '').trim();
+    if (!txt) return null;
+    try {
+      return new RegExp(txt, 'i');
+    } catch (e) {
+      if (ui.regexPreview) ui.regexPreview.textContent = `Regex hatası: ${String(e?.message || e)}`;
+      throw new Error('Geçersiz regex.');
+    }
+  }
+
+  function testRegex() {
+    try {
+      const rx = validateRegexInput();
+      if (!rx) {
+        if (ui.regexPreview) ui.regexPreview.textContent = 'Regex boş. Önizleme yapılmadı.';
+        return;
+      }
+      const sample = state.rows[0]?.ilanBasligi || 'örnek metin';
+      const ok = rx.test(sample);
+      if (ui.regexPreview) ui.regexPreview.textContent = `Regex test: ${ok ? 'eşleşti' : 'eşleşmedi'} (${sample})`;
+    } catch (e) {
+      toast(String(e?.message || e));
+    }
+  }
+
+  function toggleFullscreen() {
+    const root = byId('rakipRoot') || document.body;
+    root.classList.toggle('rakip-fullscreen'); // [KANIT@KOD: UI] class toggle only
+  }
+
+  function bind() {
+    ui.selPlatform = byId('selPlatform');
+    ui.selService = byId('selService');
+    ui.inpQtyMin = byId('inpQtyMin');
+    ui.inpQtyMax = byId('inpQtyMax');
+    ui.inpPage = byId('inpRakipPageCount');
+    ui.inpSpeed = byId('inpScanSpeed');
+    ui.tblBody = byId('tblRakipBody');
+    ui.stats = byId('rakipStats');
+    ui.empty = byId('marketEmpty');
+    ui.statusLine = byId('rakipStatusLine');
+    ui.btnStart = byId('btnRakipStart');
+    ui.btnStop = byId('btnRakipStop');
+    ui.regexInput = byId('inpRakipRegex');
+    ui.regexPreview = byId('rakipRegexPreview');
+
+    if (byId('rakipTestPreviewWrap')) byId('rakipTestPreviewWrap').textContent = '';
+
+    bindOnce(ui.selPlatform, 'change', 'selPlatform', renderServiceOptions);
+    bindOnce(ui.btnStart, 'click', 'btnRakipStart', () => startScan().catch((e) => toast(String(e?.message || e))));
+    bindOnce(ui.btnStop, 'click', 'btnRakipStop', stopScan);
+    bindOnce(byId('btnRakipClear'), 'click', 'btnRakipClear', clearTable);
+    bindOnce(byId('btnRakipCopyMd'), 'click', 'btnRakipCopyMd', () => copyTableMarkdown());
+    bindOnce(byId('btnRakipExportJson'), 'click', 'btnRakipExportJson', exportJson);
+    bindOnce(byId('btnRakipExportCsv'), 'click', 'btnRakipExportCsv', exportCsv);
+    bindOnce(byId('btnRakipRegexTest'), 'click', 'btnRakipRegexTest', testRegex);
+    bindOnce(byId('btnRakipRegexPanel'), 'click', 'btnRakipRegexPanel', testRegex);
+    bindOnce(byId('btnRakipFullscreen'), 'click', 'btnRakipFullscreen', toggleFullscreen);
+
+    if (ui.inpSpeed && !ui.inpSpeed.value) ui.inpSpeed.value = '3';
+    renderServiceOptions();
+    updateStats();
+    updateStatus('hazır');
+    setUiRunning(false);
+  }
+
+  const Rakip = {
+    init: bind,
+    startScan,
+    stopScan,
+    clearTable,
+    copyTableMarkdown,
+    exportJson,
+    exportCsv,
+    buildPageUrl,
+    speedDelayMs,
+    hashRow
+  };
+
+  window.Patpat = window.Patpat || {};
+  window.Patpat.Rakip = Rakip;
+
+  if (document.body?.dataset?.page === 'sidepanel' || byId('btnRakipStart')) {
+    Rakip.init();
+  }
 })();

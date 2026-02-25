@@ -1,81 +1,370 @@
 (() => {
   if (typeof window === 'undefined') return;
-  if (window.__SIKAYET_INIT__) return;
+  if (window.__SIKAYET_INIT__) return; // [KANIT@KOD: DURUM/STATE] __SIKAYET_INIT__ gate
   window.__SIKAYET_INIT__ = true;
   'use strict';
 
-  const SOLD_BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar';
-  const BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar';
-  const KEY = 'patpat_complaints_v4';
-  const BOUND = new Set();
+  const STORAGE_KEY = 'patpat_complaints_v3';
+  const BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar'; // [KANIT@KOD: DIŞ BAĞIMLILIK]
+  const BOUND_EVENTS = new Set();
 
-  const RX_TITLE_15 = [/^([^\n]{10,200})\n(?=[\s\S]*?\bSipariş\s*#\d+)/mi,/^([^\n]{10,200})\n[^\n]{0,200}\n\s*Sipariş\s*#\d+/mi,/(?:^|\n)([^\n]{10,200})\n(?:\1|\s*[^\n]{10,200})\n\s*Sipariş\s*#\d+/mi,/([^\n]{10,200})\s*\n\s*Sipariş\s*#\d+/mi,/([^\n]{10,200})\s*(?=\s*\n\s*\n\s*Sipariş\s*#\d+)/mi,/([^\n]{10,200})\s*\n\s*\n\s*Sipariş\s*#\d+/mi,/([A-ZÇĞİÖŞÜ0-9][^\n]{8,200})\n(?=Sipariş\s*#\d+)/m,/(?:YOUTUBE|TİKTOK|TikTok|Instagram|INSTAGRAM)\b[^\n]{5,200}/m,/^(.*(?:Beğeni|Takipçi|İzlenme|Yorum|Kaydet)[^\n]{0,160})$/mi,/^(.{10,200})$/m,/([^\n]{10,200})(?=\nSMM\s*ID:)/mi,/([^\n]{10,200})(?=\n\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})/mi,/([^\n]{10,200})(?=\n(?:Teslim|İptal|Müşteri|Sorun))/mi,/([^\n]{10,200})(?=\nToplam\s*Tutar)/mi,/([^\n]{10,200})(?=\n[\s\S]*?TL)/mi];
-  const RX_ORDER_15=[/\bSipariş\s*#(\d{5,12})\b/i,/\bSİPARİŞ\s*#(\d{5,12})\b/i,/#\s*(\d{5,12})\b/i,/\bSiparis\s*#(\d{5,12})\b/i,/\bSipariş\s*No[:\s]*#?(\d{5,12})\b/i,/\bSipariş[:\s]*#?(\d{5,12})\b/i,/\bOrder\s*#(\d{5,12})\b/i,/\bSipariş\s*ID[:\s]*#?(\d{5,12})\b/i,/\bSipariş\s*Numarası[:\s]*#?(\d{5,12})\b/i,/\bSipariş\s*-\s*#?(\d{5,12})\b/i,/\bSIPARIS\s*#(\d{5,12})\b/i,/\bSIPARIS[:\s]*#?(\d{5,12})\b/i,/\bSipariş\s*\n\s*#(\d{5,12})\b/i,/(?:^|\n)\s*Sipariş\s*#(\d{5,12})/i,/\b(\d{5,12})\b(?=[\s\S]*?SMM\s*ID:|\s*\n\s*\d{2}\.\d{2}\.\d{4})/i];
-  const RX_SMM_15=[/\bSMM\s*ID:\s*(\d{4,12})\b/i,/\bSMMID:\s*(\d{4,12})\b/i,/\bSMM\s*No[:\s]*(\d{4,12})\b/i,/\bSMM\s*#\s*(\d{4,12})\b/i,/\bID:\s*(\d{4,12})\b(?=[\s\S]*?\d{2}\.\d{2}\.\d{4})/i,/\bSMM\s*Kimlik[:\s]*(\d{4,12})\b/i,/\bSMM\s*Numara[:\s]*(\d{4,12})\b/i,/\bSMM\s*[:\s]*(\d{4,12})\b/i,/(?:^|\n)\s*(\d{4,12})\s*(?=\n\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})/m,/(?:^|\n)\s*SMM\s*\n\s*ID[:\s]*(\d{4,12})/mi,/\bSMM\s*I[D|d]\s*[:\-]\s*(\d{4,12})\b/i,/\bSMM\s*Id\s*[:\-]\s*(\d{4,12})\b/i,/\bSMM\s*IDENTIFIER[:\s]*(\d{4,12})\b/i,/\bSMM\s*CODE[:\s]*(\d{4,12})\b/i,/\b(\d{4,12})\b(?=[\s\S]*?Toplam\s*Tutar)/i];
-  const RX_DATE_15=[/\b(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})\b/,/\b(\d{1,2}\.\d{1,2}\.\d{4}\s+\d{2}:\d{2})\b/,/\b(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})\b/,/\b(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\b/,/\b(\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2})\b/,/(?:^|\n)\s*(\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2})/m,/\b(\d{2}\.\d{2}\.\d{4})\b(?=[\s\S]*?\bTeslim|\bİptal|\bMüşteri|\bSorun)/i,/\b(\d{2}:\d{2})\b(?=[\s\S]*?Toplam\s*Tutar)/i,/\b(\d{2}\.\d{2}\.\d{4}\s+\d{1,2}:\d{2})\b/,/\b(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{1,2})\b/,/(?:^|\n)\s*(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})\s*$/m,/(?:^|\n)\s*(\d{2}\.\d{2}\.\d{4})\s*$/m,/\b(\d{2}\.\d{2}\.\d{4})\b/,/\b(\d{2}\/\d{2}\/\d{4})\b/,/\b(\d{4}-\d{2}-\d{2})\b/];
-  const RX_STATUS_15=[/\bTeslim\s*Edildi\b/i,/\bİptal\s*Edildi\b/i,/\bMüşteriden\s*Onay\s*Bekleniyor\b/i,/\bSorun\s*Bildirildi\b/i,/\bIade\s*Sürecinde\b/i,/\bTeslimat\s*Bekleniyor\b/i,/\bİşlem\s*Sırasında\b/i,/\bBeklemede\b/i,/\bTamamlandı\b/i,/\bBaşarısız\b/i,/\bKısmi\s*Tamamlandı\b/i,/\bGeri\s*Ödeme\b/i,/\bOnay\s*Bekliyor\b/i,/(?:^|\n)([^\n]{3,60})(?=\nToplam\s*Tutar)/mi,/(?:^|\n)\d{2}:\d{2}\n([^\n]{3,60})/mi];
-  const RX_AMOUNT_15=[/\bToplam\s*Tutar\s*\n\s*([\d.,]+\s*TL)\b/i,/\bToplam\s*Tutar\s*([\d.,]+\s*TL)\b/i,/\bTutar\s*\n\s*([\d.,]+\s*TL)\b/i,/\bTutar[:\s]*([\d.,]+\s*TL)\b/i,/\bToplam[:\s]*([\d.,]+\s*TL)\b/i,/\bTotal\s*Amount[:\s]*([\d.,]+\s*TL)\b/i,/\bToplam\s*Ücret[:\s]*([\d.,]+\s*TL)\b/i,/\bÜcret[:\s]*([\d.,]+\s*TL)\b/i,/(?:^|\n)\s*([\d]{1,3}(?:\.[\d]{3})*(?:,[\d]{2})?)\s*TL\b/m,/\b([\d]{1,3}(?:\.[\d]{3})*(?:,[\d]{2})?)\s*TL\b/,/\b([\d]+(?:,[\d]{2})?)\s*TL\b/,/\b([\d]+(?:\.[\d]{3})*(?:,[\d]{2})?)\s*TL\b/,/TL\s*([\d.,]+)/i,/([\d.,]+)\s*(?:₺|TL)\b/i,/(?:Toplam\s*Tutar[\s\S]{0,40})\b([\d.,]+\s*(?:₺|TL))\b/i];
-  const RX_REMAINING_15=[/\bSorun\s*Bildirildi\s*\(([^)]+)\)/i,/\((\d{1,2}\s*(?:sa|saat)\s*\d{1,2}\s*(?:dk|dakika)\s*kaldı)\)/i,/\((\d{1,2}\s*(?:sa|saat)\s*kaldı)\)/i,/\((\d{1,2}\s*(?:dk|dakika)\s*kaldı)\)/i,/\bKalan\s*Süre[:\s]*([^\n]{1,40})/i,/\bKalan[:\s]*([^\n]{1,40})/i,/\bRemaining[:\s]*([^\n]{1,40})/i,/\bSüre[:\s]*([^\n]{1,40})/i,/\(([^)]*kaldı[^)]*)\)/i,/\b(\d{1,2}\s*sa\s*\d{1,2}\s*dk)\b/i,/\b(\d{1,2}\s*saat\s*\d{1,2}\s*dakika)\b/i,/\b(\d{1,2}\s*saat)\b/i,/\b(\d{1,2}\s*dakika)\b/i,/\b(\d{1,2}\s*dk)\b/i,/\b([0-9]{1,2}:[0-9]{2}\s*kaldı)\b/i];
+  // [KANIT@KOD: DÖNÜŞÜM] En az 5 regex aktif kullanım
+  const RX = Object.freeze({
+    SERVICE: /^(.+?)\n(?=SİPARİŞ\s*#)/m,
+    ORDER: /SİPARİŞ\s*#(\d+)/i,
+    SMM: /SMM\s*ID:\s*(\d+)/i,
+    DATE: /(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})/,
+    STATUS: /(SORUN\s+BİLDİRİLDİ)/i,
+    REMAIN: /SORUN\s+BİLDİRİLDİ\s*\(([^)]+)\)/i,
+    AMOUNT: /TOPLAM\s+TUTAR\s*\n\s*([\d.,]+\s*TL)/i,
+    DATE_ONLY: /^\d{2}\.\d{2}\.\d{4}$/
+  });
 
-  const state={rows:[],running:false,shouldStop:false,selectedId:''}; const ui={};
-  const byId=(id)=>document.getElementById(id); const toast=(m)=>window.__PatpatUI?.UI?.toast?.(m)||alert(m); const wait=(ms)=>new Promise((r)=>setTimeout(r,ms));
-  async function getLocal(k){const x=await chrome.storage.local.get(k); return x[k];} async function setLocal(k,v){await chrome.storage.local.set({[k]:v});}
-  function bindOnce(el,ev,key,fn){ if(!el) return; const k=`${key}:${ev}`; if(BOUND.has(k)) return; BOUND.add(k); el.addEventListener(ev,fn); }
-  function pickFirstMatch(list,text,group=1){ for(const rx of list){ const m=String(text||'').match(rx); if(m) return (group===2&&m[2])?`${m[1]} ${m[2]}`:(m[group]||m[0]||''); } return ''; }
-  function splitBlocks(pageText){ return String(pageText||'').split(/(?=Sipariş\s*#\d+)/i).map((x)=>x.trim()).filter(Boolean); }
-  function buildPageUrl(baseUrl,page){ return `${baseUrl}?page=${page}`; }
-  function todayTR(){ const d=new Date(); return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`; }
-  function validateDate(v){ return /^\d{2}\.\d{2}\.\d{4}$/.test(String(v||'')); }
+  const ui = {};
+  const state = { rows: [], running: false, shouldStop: false, selectedId: '' };
 
-  function parseComplaintBlock_SIKAYET(block, idx, baseDate){
-    const status = pickFirstMatch(RX_STATUS_15, block);
-    if(!/Sorun\s*Bildirildi/i.test(status)) return null;
-    const title = pickFirstMatch(RX_TITLE_15, block);
-    const orderNo = pickFirstMatch(RX_ORDER_15, block);
-    const smmId = pickFirstMatch(RX_SMM_15, block);
-    const dateTime = pickFirstMatch(RX_DATE_15, block) || `${baseDate} 00:00`;
-    const amountText = pickFirstMatch(RX_AMOUNT_15, block);
-    const remainingText = pickFirstMatch(RX_REMAINING_15, block);
-    const amountValue = Number(String(amountText).replace(/\./g,'').replace(',', '.').replace(/[^\d.]/g,''))||0;
-    return { id:`${orderNo||smmId||'x'}-${idx}`, service:title||null, orderNo:orderNo||'', smmId:smmId||'', dateTime, status, remainingText:remainingText||'', amountText, amountValue, raw:block };
+  const byId = (id) => document.getElementById(id);
+  const toast = (m) => window.__PatpatUI?.UI?.toast?.(m) || alert(m);
+  const log = (m) => window.__PatpatUI?.UI?.log?.('Bilgi', m) || console.log(m);
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const clean = (v) => String(v || '').replace(/\s+/g, ' ').trim();
+
+  async function getLocal(key) { const x = await chrome.storage.local.get(key); return x[key]; }
+  async function setLocal(key, val) { await chrome.storage.local.set({ [key]: val }); }
+
+  function bindOnce(el, event, key, fn) {
+    if (!el) return;
+    const token = `${key}:${event}`;
+    if (BOUND_EVENTS.has(token)) return;
+    BOUND_EVENTS.add(token);
+    el.addEventListener(event, fn);
   }
 
-  function current(){ return state.rows.find((x)=>x.id===state.selectedId)||null; }
-  function render(){ const q=String(ui.search?.value||'').toLowerCase().trim(); const list=state.rows.filter((r)=>!q||[r.service,r.orderNo,r.smmId,r.status].join(' ').toLowerCase().includes(q)); if(ui.list){ ui.list.innerHTML=list.map((r)=>`<div class="item ${r.id===state.selectedId?'active':''}" data-id="${r.id}">${r.smmId||'—'} • ${r.orderNo||'—'} • ${r.status}</div>`).join(''); ui.list.querySelectorAll('[data-id]').forEach((el)=>el.addEventListener('click',()=>{state.selectedId=el.getAttribute('data-id')||''; render();})); }
-    if(ui.empty) ui.empty.hidden=list.length>0; if(ui.stats) ui.stats.textContent=`Kayıt: ${list.length} • Durum: ${state.running?'çalışıyor':'hazır'}`;
-    const c=current(); if(ui.detail) ui.detail.innerHTML=c?`<b>HİZMET:</b> ${c.service||'—'}<br><b>SİPARİŞ:</b> ${c.orderNo||'—'}<br><b>SMM:</b> ${c.smmId||'—'}<br><b>TARİH:</b> ${c.dateTime||'—'}<br><b>DURUM:</b> ${c.status||'—'}<br><b>KALAN SÜRE:</b> ${c.remainingText||'—'}<br><b>TUTAR:</b> ${c.amountText||'—'}`:'Detay görmek için listeden bir şikayet seçin.';
-    if(ui.selStatus&&c) ui.selStatus.value=c.status||'SORUN BİLDİRİLDİ';
-  }
-  async function saveAndRefresh(){ await setLocal(KEY,state.rows); const x=await getLocal(KEY); state.rows=Array.isArray(x)?x:[]; render(); }
-
-  async function getActiveTabId(){ const [tab]=await chrome.tabs.query({active:true,lastFocusedWindow:true}); if(!tab?.id) throw new Error('Aktif sekme yok'); return tab.id; }
-  async function navigate(tabId,url){ await chrome.tabs.update(tabId,{url}); await new Promise((res)=>{ const l=(id,info)=>{ if(id===tabId&&info.status==='complete'){ chrome.tabs.onUpdated.removeListener(l); res(true);} }; chrome.tabs.onUpdated.addListener(l); }); await wait(220); }
-  async function pageText(tabId){ const [{result}] = await chrome.scripting.executeScript({target:{tabId},func:()=>String(document.body.innerText||'')}); return String(result||''); }
-
-  async function scanComplaints(){
-    if(state.running) return toast('Tarama zaten çalışıyor');
-    const dateVal = String(ui.dateInput?.value||'').trim();
-    if(!validateDate(dateVal)) return toast('Tarih GG.AA.YYYY olmalı');
-    state.running=true; state.shouldStop=false; console.log('scan start'); render();
-    const tabId=await getActiveTabId();
-    const seen=new Set(state.rows.map((r)=>`${r.orderNo}|${r.smmId}|${r.dateTime}|${r.amountText}`));
-    let page=1; let loops=0;
-    while(!state.shouldStop && loops<250){ loops++; const url=buildPageUrl(SOLD_BASE_URL,page); try{ await navigate(tabId,url); const blocks=splitBlocks(await pageText(tabId)); if(!blocks.length) break; let added=0; for(let i=0;i<blocks.length;i++){ if(state.shouldStop) break; try{ const rec=parseComplaintBlock_SIKAYET(blocks[i],`${page}-${i}`,dateVal); if(!rec) continue; const key=`${rec.orderNo}|${rec.smmId}|${rec.dateTime}|${rec.amountText}`; if(seen.has(key)) continue; seen.add(key); state.rows.push(rec); added++; }catch(e){ console.error(`Blok parse hatası url=${url}`,e);} }
-        await saveAndRefresh(); if(added===0) break; page++; } catch(e){ console.error(`Sayfa parse hatası url=${url}`,e); page++; } }
-    state.running=false; render(); toast(state.shouldStop?'Tarama durdu':`Tarama tamamlandı: ${state.rows.length}`);
+  function todayTrDate() {
+    const d = new Date();
+    return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
   }
 
-  function ensureSelected(){ const c=current(); if(!c){ toast('Önce listeden bir şikayet seçin.'); return null; } return c; }
-  function draft(){ const c=ensureSelected(); if(!c) return; if(ui.draft) ui.draft.value=`Merhaba, ${c.orderNo||'siparişiniz'} inceleniyor.`; }
-  function solution(){ const c=ensureSelected(); if(!c) return; if(ui.draft) ui.draft.value=`Çözüm: durum ${c.status}, kalan ${c.remainingText||'-'}.`; }
-  async function escalate(){ const c=ensureSelected(); if(!c) return; if(!confirm('Eskaleye gönderilsin mi?')) return; c.status='ESKALE'; await saveAndRefresh(); }
-  async function closeComplaint(){ const c=ensureSelected(); if(!c) return; if(!confirm('Kapatılsın mı?')) return; c.status='KAPALI'; await saveAndRefresh(); }
-  async function saveStatus(){ const c=ensureSelected(); if(!c) return; const prev=c.status; try{ c.status=ui.selStatus?.value||c.status; const copy=JSON.parse(JSON.stringify(state.rows)); await setLocal(KEY,copy); const refresh=await getLocal(KEY); if(!Array.isArray(refresh)) throw new Error('storage fail'); state.rows=refresh; render(); } catch(e){ c.status=prev; render(); toast('Durum kaydı geri alındı.'); } }
-  function stop(){ state.shouldStop=true; }
+  function toIsoFromTrDateTime(dt) {
+    const m = String(dt || '').match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/);
+    if (!m) return '';
+    return `${m[3]}-${m[2]}-${m[1]}T${m[4]}:${m[5]}`;
+  }
 
-  async function load(){ const x=await getLocal(KEY); state.rows=Array.isArray(x)?x:[]; render(); }
-  function bind(){ ui.dateInput=byId('inpComplaintDate'); ui.search=byId('inpComplaintSearch'); ui.stats=byId('complaintStats'); ui.list=byId('complaintsList'); ui.empty=byId('complaintEmpty'); ui.detail=byId('complaintDetail'); ui.selStatus=byId('selComplaintStatus'); ui.draft=byId('complaintDraftText'); if(ui.dateInput&&!ui.dateInput.value) ui.dateInput.value=todayTR();
-    bindOnce(byId('btnComplaintScan'),'click','scan',()=>scanComplaints().catch((e)=>toast(String(e?.message||e)))); bindOnce(byId('btnComplaintStop'),'click','stop',stop); bindOnce(byId('btnComplaintDraft'),'click','draft',draft); bindOnce(byId('btnComplaintSolution'),'click','sol',solution); bindOnce(byId('btnComplaintEscalate'),'click','esc',()=>escalate().catch(()=>{})); bindOnce(byId('btnComplaintClose'),'click','close',()=>closeComplaint().catch(()=>{})); bindOnce(byId('btnComplaintSaveStatus'),'click','save',()=>saveStatus().catch(()=>{})); bindOnce(ui.search,'input','search',render); render(); }
+  function buildPageUrl(baseUrl, page) {
+    return `${baseUrl}?page=${page}`;
+  }
 
-  const Sikayet={init:async()=>{bind(); await load();},scanComplaints,stopScan:stop,buildPageUrl}; window.Patpat=window.Patpat||{}; window.Patpat.Sikayet=Sikayet; if(document.body?.dataset?.page==='sidepanel'||byId('btnComplaintScan')) Sikayet.init();
+  function normalizeSlaDate(baseDateText, remainingText) {
+    const base = String(baseDateText || '').match(RX.DATE_ONLY) ? baseDateText : todayTrDate();
+    const [dd, mm, yyyy] = base.split('.').map(Number);
+    const ref = new Date(yyyy, (mm || 1) - 1, dd || 1);
+    const txt = String(remainingText || '').toLowerCase();
+
+    if (!txt) return '';
+    if (txt.includes('yarın')) {
+      const d = new Date(ref.getTime() + 24 * 3600 * 1000);
+      return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+    }
+    const dm = txt.match(/(\d+)\s*gün/);
+    if (dm) {
+      const d = new Date(ref.getTime() + Number(dm[1]) * 24 * 3600 * 1000);
+      return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+    }
+    const explicit = txt.match(/(\d{2}\.\d{2}\.\d{4})/);
+    if (explicit) return explicit[1];
+    return 'SLA tarihi çözümlenemedi';
+  }
+
+  function parseAmountTl(text) {
+    const raw = (String(text || '').match(RX.AMOUNT) || [, ''])[1] || '';
+    const value = Number(raw.replace(/\./g, '').replace(',', '.').replace(/\s*TL/i, '')) || 0;
+    return { amountText: raw, amountValue: value };
+  }
+
+  function parseComplaintBlock(blockText, idx, fallbackDate) {
+    const block = String(blockText || '').trim();
+    if (!block) return null;
+    if (!block.toUpperCase().includes('SORUN')) return null; // [KANIT@KOD: KOŞUL/FİLTRE]
+
+    const service = clean((block.match(RX.SERVICE) || [, ''])[1]);
+    const orderNo = (block.match(RX.ORDER) || [, ''])[1] || '';
+    const smmId = (block.match(RX.SMM) || [, ''])[1] || '';
+    const dateText = (block.match(RX.DATE) || [, ''])[1] || `${fallbackDate} 00:00`;
+    const status = (block.match(RX.STATUS) || [, ''])[1] || '';
+    const remainingText = (block.match(RX.REMAIN) || [, ''])[1] || '';
+    const amount = parseAmountTl(block);
+
+    if (!status) return null;
+
+    return {
+      id: `${orderNo || smmId || 'x'}-${idx}`,
+      service,
+      orderNo,
+      smmId,
+      dateText,
+      dateIso: toIsoFromTrDateTime(dateText),
+      status,
+      remainingText,
+      slaDate: normalizeSlaDate(fallbackDate, remainingText),
+      amountText: amount.amountText,
+      amountValue: amount.amountValue,
+      rawText: block,
+      logs: []
+    };
+  }
+
+  function splitBlocks(pageText) {
+    return String(pageText || '').split(/(?=SİPARİŞ\s*#\d+)/i).map((x) => x.trim()).filter(Boolean);
+  }
+
+  function currentRow() {
+    return state.rows.find((x) => x.id === state.selectedId) || null;
+  }
+
+  function renderDetail() {
+    if (!ui.detail) return;
+    const row = currentRow();
+    if (!row) {
+      ui.detail.textContent = 'Detay görmek için listeden bir şikayet seçin.';
+      return;
+    }
+    ui.detail.innerHTML = `<div><b>Hizmet:</b> ${row.service || '—'}</div>
+      <div><b>Sipariş:</b> ${row.orderNo || '—'}</div>
+      <div><b>SMM ID:</b> ${row.smmId || '—'}</div>
+      <div><b>Tarih:</b> ${row.dateText || '—'}</div>
+      <div><b>Durum:</b> ${row.status || '—'}</div>
+      <div><b>SLA:</b> ${row.slaDate || '—'}</div>
+      <div><b>Tutar:</b> ${row.amountText || '—'}</div>`;
+    if (ui.selStatus) ui.selStatus.value = row.status || 'SORUN BİLDİRİLDİ';
+  }
+
+  function renderList() {
+    const q = clean(ui.search?.value || '').toLowerCase();
+    const filtered = state.rows.filter((r) => !q || [r.smmId, r.orderNo, r.status, r.service].join(' ').toLowerCase().includes(q));
+
+    if (ui.list) {
+      ui.list.innerHTML = filtered.length ? filtered.map((r) => {
+        const active = r.id === state.selectedId ? 'active' : '';
+        return `<div class="item ${active}" data-id="${r.id}">${r.smmId || '—'} • ${r.orderNo || '—'} • ${r.status || '—'}</div>`;
+      }).join('') : '';
+      ui.list.querySelectorAll('[data-id]').forEach((el) => {
+        el.addEventListener('click', () => {
+          state.selectedId = el.getAttribute('data-id') || '';
+          renderDetail();
+          renderList();
+        });
+      });
+    }
+
+    if (ui.empty) ui.empty.hidden = filtered.length > 0;
+    if (ui.stats) ui.stats.textContent = `Kayıt: ${filtered.length} • Durum: ${state.running ? 'taranıyor' : 'hazır'}`;
+    renderDetail();
+  }
+
+  async function saveRowsAndRefresh() {
+    await setLocal(STORAGE_KEY, state.rows); // [KANIT@KOD: DURUM/STATE] write
+    const rows = await getLocal(STORAGE_KEY); // read+refresh
+    state.rows = Array.isArray(rows) ? rows : [];
+    renderList();
+  }
+
+  async function getActiveTabId() {
+    const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    if (!tabs[0]?.id) throw new Error('Aktif sekme bulunamadı.');
+    return tabs[0].id;
+  }
+
+  async function navigateWait(tabId, url) {
+    await chrome.tabs.update(tabId, { url });
+    await new Promise((resolve) => {
+      const listener = (id, info) => {
+        if (id === tabId && info.status === 'complete') {
+          chrome.tabs.onUpdated.removeListener(listener);
+          resolve(true);
+        }
+      };
+      chrome.tabs.onUpdated.addListener(listener);
+    });
+    await wait(250);
+  }
+
+  async function extractPageCards(tabId) {
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const cards = Array.from(document.querySelectorAll('article, .card, .list-group-item, [class*="siparis"], [class*="order"]'));
+        const blocks = cards.map((c) => String(c.innerText || '').trim()).filter(Boolean);
+        const hasNext = Boolean(document.querySelector('a[rel="next"], .pagination .next:not(.disabled), .pagination [aria-label*="Sonraki"]'));
+        return { blocks, hasNext, bodyText: String(document.body.innerText || '') };
+      }
+    });
+    return result || { blocks: [], hasNext: false, bodyText: '' };
+  }
+
+  function validDateOrThrow() {
+    const val = clean(ui.dateInput?.value || '');
+    if (!RX.DATE_ONLY.test(val)) throw new Error('Tarih GG.AA.YYYY formatında olmalıdır.');
+    return val;
+  }
+
+  // [KANIT@KOD: DÖNGÜ/BİTİRME] page++ until end
+  async function scanComplaints() {
+    if (state.running) return toast('Tarama zaten çalışıyor.');
+    const baseDate = validDateOrThrow();
+
+    state.shouldStop = false;
+    state.running = true; // [KANIT@KOD: HATA YAKALAMA/LOG] start enters
+    log('scan start');
+    renderList();
+
+    const seen = new Set(state.rows.map((x) => `${x.orderNo}|${x.smmId}|${x.dateText}`));
+    const tabId = await getActiveTabId();
+
+    let page = 1;
+    let loops = 0;
+    while (!state.shouldStop && loops < 250) { // [KANIT@KOD: KOŞUL/FİLTRE] shouldStop break
+      loops += 1;
+      const url = buildPageUrl(BASE_URL, page);
+      try {
+        await navigateWait(tabId, url);
+        const pageData = await extractPageCards(tabId);
+        const blocks = pageData.blocks.length ? pageData.blocks : splitBlocks(pageData.bodyText);
+        if (!blocks.length) break;
+
+        let pageAdded = 0;
+        for (let i = 0; i < blocks.length; i++) {
+          if (state.shouldStop) break;
+          const block = blocks[i];
+          try {
+            const parsed = parseComplaintBlock(block, `${page}-${i}`, baseDate);
+            if (!parsed) continue;
+            const key = `${parsed.orderNo}|${parsed.smmId}|${parsed.dateText}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            state.rows.push(parsed);
+            pageAdded += 1;
+          } catch (e) {
+            console.error(`Blok parse hatası page=${page} url=${url}`, e); // [KANIT@KOD: HATA YAKALAMA/LOG]
+          }
+        }
+
+        await saveRowsAndRefresh();
+        if (!pageData.hasNext && pageAdded === 0) break;
+        page += 1;
+      } catch (e) {
+        console.error(`Sayfa hatası url=${url}`, e); // [KANIT@KOD: HATA YAKALAMA/LOG]
+        page += 1;
+      }
+    }
+
+    state.running = false;
+    renderList();
+    toast(state.shouldStop ? 'Şikayet tarama durduruldu.' : `Şikayet tarama tamamlandı. ${state.rows.length} kayıt.`);
+  }
+
+  function ensureSelectedOrWarn() {
+    const row = currentRow();
+    if (!row) {
+      toast('Önce listeden bir şikayet seçin.');
+      return null;
+    }
+    return row;
+  }
+
+  function draftReply() {
+    const row = ensureSelectedOrWarn();
+    if (!row) return;
+    if (ui.draft) ui.draft.value = `Merhaba, ${row.orderNo || 'siparişiniz'} için inceleme başlatıldı.`;
+  }
+
+  function suggestSolution() {
+    const row = ensureSelectedOrWarn();
+    if (!row) return;
+    if (ui.draft) ui.draft.value = `Çözüm önerisi: ${row.status} kaydı için SLA tarihi ${row.slaDate}.`;
+  }
+
+  async function escalateComplaint() {
+    const row = ensureSelectedOrWarn();
+    if (!row) return;
+    if (!confirm('Bu kaydı eskaleye göndermek istiyor musunuz?')) return; // confirm required
+    row.status = 'ESKALE';
+    row.logs.push('ESKALE');
+    await saveRowsAndRefresh();
+  }
+
+  async function closeComplaint() {
+    const row = ensureSelectedOrWarn();
+    if (!row) return;
+    if (!confirm('Bu kaydı kapatmak istiyor musunuz?')) return; // confirm required
+    row.status = 'KAPALI';
+    row.logs.push('KAPALI');
+    await saveRowsAndRefresh();
+  }
+
+  async function saveStatusAtomic() {
+    const row = ensureSelectedOrWarn();
+    if (!row) return;
+    const nextStatus = ui.selStatus?.value || row.status;
+    const prev = row.status;
+
+    try {
+      row.status = nextStatus;
+      const copy = JSON.parse(JSON.stringify(state.rows));
+      await setLocal(STORAGE_KEY, copy);
+      const refreshed = await getLocal(STORAGE_KEY);
+      if (!Array.isArray(refreshed)) throw new Error('Storage okunamadı');
+      state.rows = refreshed;
+      renderList();
+      toast('Durum kaydedildi.');
+    } catch (e) {
+      row.status = prev; // rollback
+      renderList();
+      console.error('Durum kaydetme hatası:', e);
+      toast('Durum kaydedilemedi, işlem geri alındı.');
+    }
+  }
+
+  async function stopScan() {
+    state.shouldStop = true;
+    log('scan stop requested');
+  }
+
+  async function loadRows() {
+    const rows = await getLocal(STORAGE_KEY);
+    state.rows = Array.isArray(rows) ? rows : [];
+    renderList();
+  }
+
+  function bind() {
+    ui.dateInput = byId('inpComplaintDate');
+    ui.search = byId('inpComplaintSearch');
+    ui.stats = byId('complaintStats');
+    ui.list = byId('complaintsList');
+    ui.empty = byId('complaintEmpty');
+    ui.detail = byId('complaintDetail');
+    ui.selStatus = byId('selComplaintStatus');
+    ui.draft = byId('complaintDraftText');
+
+    if (ui.dateInput && !ui.dateInput.value) ui.dateInput.value = todayTrDate(); // [KANIT@KOD: TARİH/SÜRE]
+
+    bindOnce(byId('btnComplaintScan'), 'click', 'btnComplaintScan', () => {
+      scanComplaints().catch((e) => toast(`Şikayet tarama hatası: ${String(e?.message || e)}`));
+    });
+    bindOnce(byId('btnComplaintStop'), 'click', 'btnComplaintStop', () => stopScan());
+    bindOnce(byId('btnComplaintDraft'), 'click', 'btnComplaintDraft', draftReply);
+    bindOnce(byId('btnComplaintSolution'), 'click', 'btnComplaintSolution', suggestSolution);
+    bindOnce(byId('btnComplaintEscalate'), 'click', 'btnComplaintEscalate', () => { escalateComplaint().catch(() => toast('Eskale hatası')); });
+    bindOnce(byId('btnComplaintClose'), 'click', 'btnComplaintClose', () => { closeComplaint().catch(() => toast('Kapatma hatası')); });
+    bindOnce(byId('btnComplaintSaveStatus'), 'click', 'btnComplaintSaveStatus', () => { saveStatusAtomic().catch(() => toast('Kaydetme hatası')); });
+    bindOnce(ui.search, 'input', 'inpComplaintSearch', renderList);
+  }
+
+  const Sikayet = { init: async () => { bind(); await loadRows(); }, scanComplaints, stopScan, buildPageUrl };
+  window.Patpat = window.Patpat || {};
+  window.Patpat.Sikayet = Sikayet;
+
+  if (document.body?.dataset?.page === 'sidepanel' || byId('btnComplaintScan')) {
+    Sikayet.init();
+  }
 })();
