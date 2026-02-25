@@ -363,6 +363,34 @@
     /\bProcessing|Completed|Pending\b/i
   ];
 
+  const ALLOWED_STATUS_SET = ['Beklemede', 'Yükleniyor', 'Tamamlandı', 'Kısmen Tamamlandı', 'İşlem Sırasında', 'İptal Edildi'];
+  const MESSAGE_TEMPLATES = {
+    refund_request: 'İade talebinizi aldık. Ekibimiz siparişi kontrol edip size hızlıca dönüş yapacak.',
+    issue_reported: 'Sorun bildiriminizi aldık. Siparişinizi kontrol ediyoruz, en kısa sürede güncelleme paylaşacağız.'
+  };
+
+  function normalizeComplaintStatus(statusText) {
+    const t = String(statusText || '').toLowerCase();
+    if (t.includes('bekle') || t.includes('pending')) return 'Beklemede';
+    if (t.includes('yüklen') || t.includes('inprogress')) return 'Yükleniyor';
+    if (t.includes('kısmen')) return 'Kısmen Tamamlandı';
+    if (t.includes('işlem') || t.includes('islem')) return 'İşlem Sırasında';
+    if (t.includes('iptal') || t.includes('cancel')) return 'İptal Edildi';
+    if (t.includes('tamam') || t.includes('teslim') || t.includes('completed')) return 'Tamamlandı';
+    return 'Beklemede';
+  }
+
+  function isMessageAllowed(rec) {
+    const t = `${rec?.status || ''} ${rec?.rawText || ''}`.toLowerCase();
+    return t.includes('iade') || t.includes('sorun bildir');
+  }
+
+  function pickMessageTemplate(rec) {
+    const t = `${rec?.status || ''} ${rec?.rawText || ''}`.toLowerCase();
+    if (t.includes('iade')) return { id: 'refund_request', text: MESSAGE_TEMPLATES.refund_request };
+    return { id: 'issue_reported', text: MESSAGE_TEMPLATES.issue_reported };
+  }
+
   // ───────────────────────────────────────────────────────────────────────────
   // Genel yardımcılar (UI, bekleme, seçim)
   // ───────────────────────────────────────────────────────────────────────────
@@ -462,7 +490,7 @@
       platform: pickFirstMatch([/(TIKTOK|INSTAGRAM|YOUTUBE|TWITTER)/i], block, 1) || '',
       serviceName: cleanService(serviceName),
       dateText,
-      status,
+      status: normalizeComplaintStatus(status),
       remainingText,
       amountText,
       amountValue,
@@ -476,7 +504,8 @@
       remains: Number((String(block).match(/Kalan\s*:?\s*(\d+)/i) || [,''])[1]) || null,
       tags: [],
       rawText: block,
-      logs: []
+      logs: [],
+      kmg: false
     };
   }
 
@@ -551,18 +580,38 @@
   // MADDE 13.2 (Liste HTML satırlarını data-id ile üret KODLANDI)
   function renderList(list) {
     if (!ui.list) return;
-    ui.list.innerHTML = list.map((r) => {
-      const active = r.id === state.selectedId ? 'active' : '';
-      const urgency = riskTag(r.slaMinutes);
-      return `<div class="fileitem ${active}" data-id="${r.id}"
-        style="margin-bottom:6px;border:1px solid rgba(255,255,255,.1)">
-        <span>${r.smmId || '—'} • ${r.orderNo || '—'} • ${r.platform || '-'} </span>
-        <span>${r.status || '-'} • ${urgency}</span>
-      </div>`;
-    }).join('') || '<div class="empty">Şikayet kaydı yok.</div>';
+    const rows = list.map((r) => {
+      const active = r.id === state.selectedId ? ' class="active"' : '';
+      return `<tr data-id="${r.id}"${active}>
+        <td>${r.serviceName || '—'}</td>
+        <td>${r.orderNo || '—'}</td>
+        <td>${r.smmId || '—'}</td>
+        <td>${r.dateText || '—'}</td>
+        <td>${normalizeComplaintStatus(r.status)}</td>
+        <td>${r.customer || '—'}</td>
+        <td>${r.kmg ? '✓' : '—'}</td>
+      </tr>`;
+    }).join('');
 
-    // MADDE 13.3 (Tıklayınca selectedId güncelle render yap KODLANDI)
-    ui.list.querySelectorAll('[data-id]').forEach((el) => {
+    ui.list.innerHTML = `
+      <div style="overflow:auto; border:1px solid rgba(255,255,255,.12); border-radius:12px;">
+        <table style="width:100%; border-collapse:collapse; min-width:980px;">
+          <thead>
+            <tr>
+              <th>İlan Başlığı</th>
+              <th>Sipariş No</th>
+              <th>SMM ID</th>
+              <th>Tarih</th>
+              <th>Durum</th>
+              <th>K.</th>
+              <th>KMG</th>
+            </tr>
+          </thead>
+          <tbody>${rows || '<tr><td colspan="7">Şikayet kaydı yok.</td></tr>'}</tbody>
+        </table>
+      </div>`;
+
+    ui.list.querySelectorAll('tbody tr[data-id]').forEach((el) => {
       el.addEventListener('click', () => {
         state.selectedId = el.getAttribute('data-id') || '';
         render();
@@ -804,7 +853,7 @@
           platform: detectPlatform(text),
           serviceName,
           dateText,
-          status: pickFirstMatch(RX_STATUS_15, text, 1) || 'Sorun Bildirildi',
+          status: normalizeComplaintStatus(pickFirstMatch(RX_STATUS_15, text, 1) || 'Sorun Bildirildi'),
           remainingText: pickFirstMatch(RX_REMAINING_15, text, 1) || '',
           amountText,
           amountValue: moneyToNumber(amountText),
@@ -819,7 +868,8 @@
           messageUrl,
           tags: [],
           rawText: text,
-          logs: [`${new Date().toLocaleString('tr-TR')} kart okundu`, Number.isFinite(slaMinutes) ? `SLA ${slaMinutes} dk` : 'SLA yok']
+          logs: [`${new Date().toLocaleString('tr-TR')} kart okundu`, Number.isFinite(slaMinutes) ? `SLA ${slaMinutes} dk` : 'SLA yok'],
+          kmg: false
         };
 
         rec.tags = classify(rec);
@@ -842,6 +892,8 @@
 
           // URL’ler bu modda sayfa içinden çıkmadıysa boş kalır
           rec0.id = makeId(rec0.orderNo, rec0.smmId);
+          rec0.status = normalizeComplaintStatus(rec0.status);
+          rec0.kmg = Boolean(rec0.kmg);
           rec0.tags = classify(rec0);
           rec0.logs = [`${new Date().toLocaleString('tr-TR')} body-parse okundu`];
 
@@ -918,6 +970,14 @@
   async function runMessageSendFlow() {
     const rec = current();
     if (!rec) return toast('Önce bir kayıt seçin.');
+
+    if (!isMessageAllowed(rec)) return toast('Mesaj sadece iade isteyen veya sorun bildiren kayıtlarda gönderilebilir.');
+
+    if (ui.draft) {
+      const tpl = pickMessageTemplate(rec);
+      ui.draft.value = tpl.text;
+      rec.lastTemplateId = tpl.id;
+    }
 
     const tabId = await getActiveTabId();
 
@@ -1080,8 +1140,19 @@
       }]
     );
 
-    if (result?.ok) toast('Mesaj ekranı açıldı.');
-    else toast(`Mesaj akışı başarısız: ${result?.step || 'bilinmiyor'}`);
+    if (result?.ok) {
+      rec.kmg = true;
+      rec.logs = rec.logs || [];
+      rec.logs.push(`${new Date().toLocaleString('tr-TR')} mesaj akışı açıldı`);
+      await saveAndRefresh(state, render);
+      toast('Mesaj ekranı açıldı. KMG güncellendi.');
+    } else {
+      console.error('[KMG] Mesaj gönderimi başarısız', result);
+      rec.logs = rec.logs || [];
+      rec.logs.push(`${new Date().toLocaleString('tr-TR')} mesaj akışı başarısız: ${result?.step || 'bilinmiyor'}`);
+      await saveAndRefresh(state, render);
+      toast(`Mesaj akışı başarısız: ${result?.step || 'bilinmiyor'}`);
+    }
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -1308,11 +1379,11 @@
     // önce v4 dene
     const v4 = await getLocal(STORAGE.KEY_V4);
     if (Array.isArray(v4)) {
-      state.rows = v4;
+      state.rows = v4.map((r) => ({ ...r, kmg: Boolean(r?.kmg), status: normalizeComplaintStatus(r?.status) }));
     } else {
       // v1 varsa migrate
       const v1 = await getLocal(STORAGE.KEY_V1);
-      state.rows = Array.isArray(v1) ? v1 : [];
+      state.rows = (Array.isArray(v1) ? v1 : []).map((r) => ({ ...r, kmg: Boolean(r?.kmg), status: normalizeComplaintStatus(r?.status) }));
       if (state.rows.length) await setLocal(STORAGE.KEY_V4, state.rows);
     }
 

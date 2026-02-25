@@ -719,7 +719,7 @@
   const UI = {
     els: {},
     state: {
-      activeTab: 'orders',
+      activeTab: 'tab-sikayet-siparis',
       online: 'bilinmiyor',
       site: '—',
       aiModel: '',
