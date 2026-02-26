@@ -4,9 +4,9 @@
   window.__SIPARIS_INIT__ = true;
   'use strict';
 
-  const SOLD_BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar';
-  const BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar';
-  const STATUSES = ['pending', 'processing', 'completed', 'cancelled', 'returnprocess'];
+  const SOLD_BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar?';
+  const BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar?';
+  const ALLOWED_STATUSES = ['pending', 'processing', 'completed', 'cancelled', 'returnprocess', 'problematic'];
   const BOUND = new Set();
 
   const RX_TITLE_15 = [
@@ -45,8 +45,9 @@
   function speedDelayMs(){ return Math.max(40, Math.round(1800/Math.max(1,Math.min(100,Number(state.speed||3))))); }
   function parseSpeed(){ const n=Number(ui.inpSpeed?.value||3); if(!Number.isFinite(n)) throw new Error('Hız sayı olmalı'); state.speed=Math.max(1,Math.min(100,n)); if(ui.inpSpeed) ui.inpSpeed.value=String(state.speed); }
   function parseMax(){ const n=Number(ui.inpMaxPage?.value); if(!Number.isFinite(n)||n<1) throw new Error('Sayfa sayısı en az 1 olmalı'); return Math.floor(n); }
-  function buildPageUrl(baseUrl,page,status=''){ const q=[`page=${page}`]; if(status) q.push(`status=${encodeURIComponent(status)}`); return `${baseUrl}?${q.join('&')}`; }
-  function normalizeStatus(v){ const s=String(v||'').trim(); const t=s.toLowerCase(); if(t.includes('müşteriden onay bekleniyor')) return 'processing'; if(t.includes('teslim edildi')) return 'completed'; if(t.includes('iptal edildi')) return 'cancelled'; if(t.includes('sorun bildirildi')) return 'problem'; return t; }
+  function sanitizeStatus(status='pending'){ const s=String(status||'').trim().toLowerCase(); return ALLOWED_STATUSES.includes(s)?s:'pending'; }
+  function buildPageUrl(baseUrl,page,status='pending'){ const safeStatus=sanitizeStatus(status); const safePage=Math.max(1,Math.floor(Number(page)||1)); return `${baseUrl}status=${safeStatus}&page=${safePage}`; }
+  function normalizeStatus(v){ const s=String(v||'').trim(); const t=s.toLowerCase(); if(t.includes('müşteriden onay bekleniyor')) return 'processing'; if(t.includes('teslim edildi')) return 'completed'; if(t.includes('iptal edildi')) return 'cancelled'; if(t.includes('sorun bildirildi')) return 'problematic'; if(t.includes('iade sürecinde')||t.includes('returnprocess')) return 'returnprocess'; if(t.includes('beklemede')||t.includes('pending')) return 'pending'; return sanitizeStatus(t); }
   function normalizeTitleFromLines(block, title){ const lines=String(block||'').split('\n').map((x)=>x.trim()).filter(Boolean); if(lines[0]&&lines[1]&&lines[0]===lines[1]) return lines[0]; return title||lines[0]||''; }
 
   async function hashRow(r){ const src=`${r.orderNo}|${r.smmId}|${r.dateTime}|${r.amountTl}|${r.status}`; const d=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(src)); return Array.from(new Uint8Array(d)).map((b)=>b.toString(16).padStart(2,'0')).join(''); }
@@ -104,7 +105,7 @@
       if(!Number.isFinite(maxPage)||maxPage<1) throw new Error('maxPage geçersiz');
       updateStats('çalışıyor');
       const tabId = await getActiveTabId();
-      const list = status==='all'?STATUSES:[status];
+      const list = status==='all'?ALLOWED_STATUSES:[sanitizeStatus(status)];
       for(const st of list){ if(state.stop) break; await scanStatus(tabId, st, maxPage); }
       updateStats(state.stop?'durduruldu':'tamamlandı');
     } catch (e){ toast(String(e?.message||e)); }
