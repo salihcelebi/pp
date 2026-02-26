@@ -4,8 +4,10 @@
   window.__SIKAYET_INIT__ = true;
   'use strict';
 
-  const SOLD_BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar';
-  const BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar';
+  const SOLD_BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar?';
+  const BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar?';
+  const ALLOWED_STATUSES = ['pending', 'processing', 'completed', 'cancelled', 'returnprocess', 'problematic'];
+  const DEFAULT_SCAN_STATUS = 'returnprocess';
   const KEY = 'patpat_complaints_v4';
   const BOUND = new Set();
 
@@ -23,7 +25,8 @@
   function bindOnce(el,ev,key,fn){ if(!el) return; const k=`${key}:${ev}`; if(BOUND.has(k)) return; BOUND.add(k); el.addEventListener(ev,fn); }
   function pickFirstMatch(list,text,group=1){ for(const rx of list){ const m=String(text||'').match(rx); if(m) return (group===2&&m[2])?`${m[1]} ${m[2]}`:(m[group]||m[0]||''); } return ''; }
   function splitBlocks(pageText){ return String(pageText||'').split(/(?=Sipariş\s*#\d+)/i).map((x)=>x.trim()).filter(Boolean); }
-  function buildPageUrl(baseUrl,page){ return `${baseUrl}?page=${page}`; }
+  function sanitizeStatus(status=DEFAULT_SCAN_STATUS){ const s=String(status||'').trim().toLowerCase(); return ALLOWED_STATUSES.includes(s)?s:DEFAULT_SCAN_STATUS; }
+  function buildPageUrl(baseUrl,page,status=DEFAULT_SCAN_STATUS){ const safeStatus=sanitizeStatus(status); const safePage=Math.max(1,Math.floor(Number(page)||1)); return `${baseUrl}status=${safeStatus}&page=${safePage}`; }
   function todayTR(){ const d=new Date(); return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`; }
   function validateDate(v){ return /^\d{2}\.\d{2}\.\d{4}$/.test(String(v||'')); }
 
@@ -74,13 +77,13 @@
     state.running=true; state.shouldStop=false; console.log('scan start'); render();
     const tabId=await getActiveTabId();
     // zorunlu başlangıç ziyareti
-    await navigate(tabId, SOLD_BASE_URL);
+    await navigate(tabId, buildPageUrl(SOLD_BASE_URL,1,DEFAULT_SCAN_STATUS));
 
     const seen=new Set(state.rows.map((r)=>`${r.orderNo}|${r.smmId}|${r.dateTime}|${r.amountText}`));
     let page=1; let loops=0;
     while(!state.shouldStop && loops<250){
       loops++;
-      const url=buildPageUrl(SOLD_BASE_URL,page);
+      const url=buildPageUrl(SOLD_BASE_URL,page,DEFAULT_SCAN_STATUS);
       try{
         await navigate(tabId,url);
         const blocks=splitBlocks(await pageText(tabId));
