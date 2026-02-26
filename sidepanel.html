@@ -27,9 +27,10 @@
       --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
     }
     *{box-sizing:border-box}
-    html,body{height:100%}
+    html,body{height:100%; width:100vw; margin:0;}
     body{
       margin:0;
+      width:100vw;
       background: radial-gradient(900px 500px at 10% 0%, rgba(110,168,255,.22), transparent 55%),
                   radial-gradient(700px 480px at 90% 10%, rgba(155,123,255,.18), transparent 55%),
                   var(--bg);
@@ -211,12 +212,15 @@
     /* Bölüm 3: Sekme Çubuğu */
     .tabbar{
       display:flex;
+      flex-wrap:wrap;
       gap:8px;
       padding:12px 14px 0;
+      overflow-x:auto;
+      -webkit-overflow-scrolling:touch;
     }
     .tab{
-      flex:1;
-      min-width:0;
+      flex:1 1 160px;
+      min-width:160px;
       border:1px solid var(--line);
       background: rgba(15,22,48,.55);
       border-radius: 14px;
@@ -247,10 +251,12 @@
 
     /* Bölüm 4: Ana Yerleşim */
     .layout{
-      display:grid;
-      grid-template-columns: 1fr 360px;
+      display:flex;
+      flex-direction:column;
       gap:12px;
-      padding:12px 14px 16px;
+      padding:0;
+      width:100%;
+      max-width:none;
     }
     .main, .right{
       border:1px solid var(--line);
@@ -258,8 +264,10 @@
       border-radius: var(--radius2);
       box-shadow: var(--shadow);
       overflow:hidden;
-      min-height: 560px;
+      width:100%;
+      min-height: 420px;
     }
+    .main{display:flex;flex-direction:column;min-height:0;}
     .mainheader{
       padding:14px 14px 12px;
       border-bottom:1px solid var(--line);
@@ -278,9 +286,11 @@
       font-size:12px;
       line-height:1.35;
     }
-    .mainbody{padding:14px;}
-    #tab-sikayet-siparis{padding:0;min-height:960px;}
-    #tab-sikayet-siparis iframe{display:block;width:100%;height:960px;border:0;border-radius:14px;background:transparent;}
+    .mainbody{padding:14px; flex:1; min-height:0; overflow:hidden;}
+    .mainbody > .tabpanel{max-height: calc(100vh - 260px); overflow-y:auto; overflow-x:hidden; padding:0;}
+    .mainbody > .tabpanel .cards{padding:0;}
+
+    #tab-sikayet-siparis{padding:0; min-height:0;}
     .cards{
       display:grid;
       grid-template-columns: 1fr;
@@ -610,7 +620,565 @@
     .footer-ai .footer-head{display:flex;justify-content:space-between;align-items:center;gap:10px;}
     .footer-ai .footer-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}
     @media (max-width:980px){.footer-ai .footer-grid{grid-template-columns:1fr}}
-  </style>
+  
+#tab-sikayet-siparis{
+      --bg:#0b1020;
+      --bg2:#0f1730;
+      --card:#101a36;
+      --card2:#0f1833;
+      --text:#e9eeff;
+      --muted:rgba(233,238,255,.72);
+      --muted2:rgba(233,238,255,.55);
+      --line:rgba(255,255,255,.10);
+      --line2:rgba(255,255,255,.14);
+      --good:#2ee59d;
+      --warn:#ffc857;
+      --bad:#ff5d5d;
+      --info:#6aa7ff;
+      --shadow: 0 12px 34px rgba(0,0,0,.35);
+      --radius:16px;
+      --radius2:12px;
+      --gap:12px;
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+
+#tab-sikayet-siparis *{ box-sizing:border-box; }
+#tab-sikayet-siparis html, #tab-sikayet-siparis body{ height:100%; }
+#tab-sikayet-siparis body{
+      margin:0;
+      font-family:var(--font);
+      background: radial-gradient(1200px 600px at 20% 0%, rgba(106,167,255,.18), transparent 60%),
+                  radial-gradient(900px 500px at 100% 0%, rgba(46,229,157,.12), transparent 55%),
+                  linear-gradient(180deg, var(--bg), var(--bg2));
+      color:var(--text);
+      overflow:hidden;
+    }
+
+    /* Sidepanel root */
+#tab-sikayet-siparis .app{
+      height:100%;
+      display:flex;
+      flex-direction:column;
+      gap: var(--gap);
+      padding:14px;
+    }
+
+    /* Header */
+#tab-sikayet-siparis .header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:12px 14px;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background: linear-gradient(180deg, rgba(16,26,54,.80), rgba(16,26,54,.55));
+      box-shadow: var(--shadow);
+    }
+#tab-sikayet-siparis .titleWrap{ display:flex; align-items:center; gap:12px; min-width:0; }
+#tab-sikayet-siparis .logo{
+      width:36px; height:36px; border-radius:12px;
+      background: linear-gradient(135deg, rgba(106,167,255,.9), rgba(46,229,157,.85));
+      display:grid; place-items:center;
+      box-shadow: 0 10px 24px rgba(0,0,0,.35);
+      flex:0 0 auto;
+      user-select:none;
+    }
+#tab-sikayet-siparis .logo span{ font-weight:900; color:#0b1020; letter-spacing:.5px; }
+#tab-sikayet-siparis .titles{ min-width:0; }
+#tab-sikayet-siparis .titles h1{
+      margin:0;
+      font-size:14px;
+      line-height:1.2;
+      letter-spacing:.2px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+#tab-sikayet-siparis .titles p{
+      margin:4px 0 0;
+      font-size:12px;
+      color:var(--muted);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+#tab-sikayet-siparis .headerRight{
+      display:flex; align-items:center; gap:10px; flex:0 0 auto;
+    }
+#tab-sikayet-siparis .pill{
+      font-size:12px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      color:var(--muted);
+      background: rgba(255,255,255,.03);
+      user-select:none;
+      white-space:nowrap;
+    }
+#tab-sikayet-siparis #ssStats{ color:var(--text); border-color:var(--line2); }
+
+    /* Controls */
+#tab-sikayet-siparis .controls{
+      display:grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: var(--gap);
+      min-height: 118px;
+    }
+
+#tab-sikayet-siparis .panel{
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background: linear-gradient(180deg, rgba(16,26,54,.72), rgba(16,26,54,.45));
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+#tab-sikayet-siparis .panelHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      border-bottom:1px solid var(--line);
+      background: rgba(255,255,255,.02);
+    }
+#tab-sikayet-siparis .panelHeader h2{
+      margin:0;
+      font-size:12px;
+      letter-spacing:.18px;
+      color:var(--muted);
+      font-weight:700;
+      text-transform:uppercase;
+    }
+#tab-sikayet-siparis .panelBody{
+      padding:12px;
+    }
+
+#tab-sikayet-siparis .grid2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+#tab-sikayet-siparis .field{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      min-width:0;
+    }
+#tab-sikayet-siparis .label{
+      font-size:11px;
+      color:var(--muted2);
+      letter-spacing:.2px;
+    }
+#tab-sikayet-siparis .row{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      min-width:0;
+    }
+
+#tab-sikayet-siparis input[type="text"], #tab-sikayet-siparis input[type="number"], #tab-sikayet-siparis textarea{
+      width:100%;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.18);
+      color: var(--text);
+      padding:10px 10px;
+      outline:none;
+      font-size:13px;
+    }
+#tab-sikayet-siparis input[type="number"]{ padding-right:8px; }
+#tab-sikayet-siparis input::placeholder, #tab-sikayet-siparis textarea::placeholder{ color: rgba(233,238,255,.40); }
+
+#tab-sikayet-siparis input[type="range"]{
+      width:100%;
+      accent-color: var(--info);
+    }
+
+#tab-sikayet-siparis .btnRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      align-items:center;
+    }
+
+#tab-sikayet-siparis .btn{
+      border-radius:12px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.05);
+      color: var(--text);
+      padding:10px 12px;
+      font-size:12px;
+      font-weight:700;
+      letter-spacing:.15px;
+      cursor:pointer;
+      transition: transform .05s ease, background .12s ease, border-color .12s ease;
+      user-select:none;
+    }
+#tab-sikayet-siparis .btn:active{ transform: translateY(1px); }
+#tab-sikayet-siparis .btn:hover{ background: rgba(255,255,255,.08); border-color: var(--line2); }
+#tab-sikayet-siparis .btn.primary{ background: rgba(106,167,255,.20); border-color: rgba(106,167,255,.35); }
+#tab-sikayet-siparis .btn.danger{ background: rgba(255,93,93,.14); border-color: rgba(255,93,93,.32); }
+#tab-sikayet-siparis .btn.good{ background: rgba(46,229,157,.14); border-color: rgba(46,229,157,.32); }
+#tab-sikayet-siparis .btn.warn{ background: rgba(255,200,87,.14); border-color: rgba(255,200,87,.32); }
+
+#tab-sikayet-siparis .hint{
+      font-size:12px;
+      color: var(--muted);
+      line-height:1.35;
+      margin-top:8px;
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px dashed var(--line);
+      background: rgba(255,255,255,.03);
+    }
+
+    /* Main layout */
+#tab-sikayet-siparis .main{
+      flex:1 1 auto;
+      min-height:0;
+      display:grid;
+      grid-template-columns: 0.95fr 1.25fr;
+      gap: var(--gap);
+    }
+
+#tab-sikayet-siparis .listWrap, #tab-sikayet-siparis .detailWrap{
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+    }
+
+#tab-sikayet-siparis .scroll{
+      overflow:auto;
+      padding: 10px;
+    }
+
+    /* List items created by JS: .fileitem + .active */
+#tab-sikayet-siparis .fileitem{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 10px;
+      border-radius:12px;
+      background: rgba(0,0,0,.15);
+      cursor:pointer;
+      transition: background .12s ease, border-color .12s ease;
+      user-select:none;
+    }
+#tab-sikayet-siparis .fileitem:hover{
+      background: rgba(0,0,0,.22);
+    }
+#tab-sikayet-siparis .fileitem span{
+      font-size:12px;
+      color: var(--text);
+      opacity:.95;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+#tab-sikayet-siparis .fileitem.active{
+      outline: 2px solid rgba(106,167,255,.45);
+      background: rgba(106,167,255,.10);
+    }
+#tab-sikayet-siparis .empty{
+      padding:14px;
+      font-size:12px;
+      color: var(--muted);
+      border:1px dashed var(--line);
+      border-radius:12px;
+      background: rgba(255,255,255,.03);
+    }
+
+    /* Detail area: JS fills innerHTML */
+#tab-sikayet-siparis #complaintDetail a{
+      color: var(--info);
+      text-decoration:none;
+      word-break:break-all;
+    }
+#tab-sikayet-siparis #complaintDetail a:hover{ text-decoration:underline; }
+
+    /* Draft */
+#tab-sikayet-siparis .draftArea{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      min-height:0;
+    }
+#tab-sikayet-siparis textarea{
+      min-height: 140px;
+      resize: vertical;
+      line-height:1.35;
+      font-size:13px;
+    }
+
+
+#tab-sikayet-siparis #complaintsList table th, #tab-sikayet-siparis #complaintsList table td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.08);font-size:12px;text-align:left;}
+#tab-sikayet-siparis #complaintsList table tbody tr{cursor:pointer;}
+#tab-sikayet-siparis #complaintsList table tbody tr.active{background:rgba(106,167,255,.14);}
+    /* Footer */
+#tab-sikayet-siparis .footer{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background: rgba(255,255,255,.03);
+      color: var(--muted);
+      font-size:11px;
+      box-shadow: var(--shadow);
+    }
+#tab-sikayet-siparis .kbd{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono";
+      padding:2px 6px;
+      border-radius:8px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.18);
+      color: var(--text);
+      font-size:11px;
+    }
+
+    /* Responsive */
+    @media (max-width: 820px){
+#tab-sikayet-siparis .controls{ grid-template-columns: 1fr; }
+#tab-sikayet-siparis .main{ grid-template-columns: 1fr; }
+#tab-sikayet-siparis textarea{ min-height: 160px; }
+    }
+  
+
+
+/* ---- FIX: SS panel embedded sizing ---- */
+.mainbody{display:flex;flex-direction:column;}
+.mainbody > .tabpanel{flex:1;min-height:0;height:100%;max-height:none;overflow:auto;padding:0;}
+#tab-sikayet-siparis{height:100%;}
+#tab-sikayet-siparis .app{height:100%;min-height:0;}
+#tab-sikayet-siparis .grid{flex:1;min-height:0;}
+
+/* ---- Scoped SS styles ---- */
+#tab-sikayet-siparis *{ box-sizing:border-box; }#tab-sikayet-siparis /* Sidepanel root */
+    .app{
+      height:100%;
+      display:flex;
+      flex-direction:column;
+      gap: var(--gap);
+      padding:14px;
+    }#tab-sikayet-siparis /* Header */
+    .header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:12px 14px;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background: linear-gradient(180deg, rgba(16,26,54,.80), rgba(16,26,54,.55));
+      box-shadow: var(--shadow);
+    }#tab-sikayet-siparis .titleWrap{ display:flex; align-items:center; gap:12px; min-width:0; }#tab-sikayet-siparis .logo{
+      width:36px; height:36px; border-radius:12px;
+      background: linear-gradient(135deg, rgba(106,167,255,.9), rgba(46,229,157,.85));
+      display:grid; place-items:center;
+      box-shadow: 0 10px 24px rgba(0,0,0,.35);
+      flex:0 0 auto;
+      user-select:none;
+    }#tab-sikayet-siparis .logo span{ font-weight:900; color:#0b1020; letter-spacing:.5px; }#tab-sikayet-siparis .titles{ min-width:0; }#tab-sikayet-siparis .titles h1{
+      margin:0;
+      font-size:14px;
+      line-height:1.2;
+      letter-spacing:.2px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }#tab-sikayet-siparis .titles p{
+      margin:4px 0 0;
+      font-size:12px;
+      color:var(--muted);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }#tab-sikayet-siparis .headerRight{
+      display:flex; align-items:center; gap:10px; flex:0 0 auto;
+    }#tab-sikayet-siparis .pill{
+      font-size:12px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      color:var(--muted);
+      background: rgba(255,255,255,.03);
+      user-select:none;
+      white-space:nowrap;
+    }#tab-sikayet-siparis #complaintStats{ color:var(--text); border-color:var(--line2); }#tab-sikayet-siparis /* Controls */
+    .controls{
+      display:grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: var(--gap);
+      min-height: 118px;
+    }#tab-sikayet-siparis .panel{
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background: linear-gradient(180deg, rgba(16,26,54,.72), rgba(16,26,54,.45));
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }#tab-sikayet-siparis .panelHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      border-bottom:1px solid var(--line);
+      background: rgba(255,255,255,.02);
+    }#tab-sikayet-siparis .panelHeader h2{
+      margin:0;
+      font-size:12px;
+      letter-spacing:.18px;
+      color:var(--muted);
+      font-weight:700;
+      text-transform:uppercase;
+    }#tab-sikayet-siparis .panelBody{
+      padding:12px;
+    }#tab-sikayet-siparis .grid2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }#tab-sikayet-siparis .field{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      min-width:0;
+    }#tab-sikayet-siparis .label{
+      font-size:11px;
+      color:var(--muted2);
+      letter-spacing:.2px;
+    }#tab-sikayet-siparis .row{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      min-width:0;
+    }#tab-sikayet-siparis input[type="text"], #tab-sikayet-siparis input[type="number"], #tab-sikayet-siparis textarea{
+      width:100%;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.18);
+      color: var(--text);
+      padding:10px 10px;
+      outline:none;
+      font-size:13px;
+    }#tab-sikayet-siparis input[type="number"]{ padding-right:8px; }#tab-sikayet-siparis input::placeholder, #tab-sikayet-siparis textarea::placeholder{ color: rgba(233,238,255,.40); }#tab-sikayet-siparis input[type="range"]{
+      width:100%;
+      accent-color: var(--info);
+    }#tab-sikayet-siparis .btnRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      align-items:center;
+    }#tab-sikayet-siparis .btn{
+      border-radius:12px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.05);
+      color: var(--text);
+      padding:10px 12px;
+      font-size:12px;
+      font-weight:700;
+      letter-spacing:.15px;
+      cursor:pointer;
+      transition: transform .05s ease, background .12s ease, border-color .12s ease;
+      user-select:none;
+    }#tab-sikayet-siparis .btn:active{ transform: translateY(1px); }#tab-sikayet-siparis .btn:hover{ background: rgba(255,255,255,.08); border-color: var(--line2); }#tab-sikayet-siparis .btn.primary{ background: rgba(106,167,255,.20); border-color: rgba(106,167,255,.35); }#tab-sikayet-siparis .btn.danger{ background: rgba(255,93,93,.14); border-color: rgba(255,93,93,.32); }#tab-sikayet-siparis .btn.good{ background: rgba(46,229,157,.14); border-color: rgba(46,229,157,.32); }#tab-sikayet-siparis .btn.warn{ background: rgba(255,200,87,.14); border-color: rgba(255,200,87,.32); }#tab-sikayet-siparis .hint{
+      font-size:12px;
+      color: var(--muted);
+      line-height:1.35;
+      margin-top:8px;
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px dashed var(--line);
+      background: rgba(255,255,255,.03);
+    }#tab-sikayet-siparis /* Main layout */
+    .main{
+      flex:1 1 auto;
+      min-height:0;
+      display:grid;
+      grid-template-columns: 0.95fr 1.25fr;
+      gap: var(--gap);
+    }#tab-sikayet-siparis .listWrap, #tab-sikayet-siparis .detailWrap{
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+    }#tab-sikayet-siparis .scroll{
+      overflow:auto;
+      padding: 10px;
+    }#tab-sikayet-siparis /* List items created by JS: .fileitem + .active */
+    .fileitem{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 10px;
+      border-radius:12px;
+      background: rgba(0,0,0,.15);
+      cursor:pointer;
+      transition: background .12s ease, border-color .12s ease;
+      user-select:none;
+    }#tab-sikayet-siparis .fileitem:hover{
+      background: rgba(0,0,0,.22);
+    }#tab-sikayet-siparis .fileitem span{
+      font-size:12px;
+      color: var(--text);
+      opacity:.95;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }#tab-sikayet-siparis .fileitem.active{
+      outline: 2px solid rgba(106,167,255,.45);
+      background: rgba(106,167,255,.10);
+    }#tab-sikayet-siparis .empty{
+      padding:14px;
+      font-size:12px;
+      color: var(--muted);
+      border:1px dashed var(--line);
+      border-radius:12px;
+      background: rgba(255,255,255,.03);
+    }#tab-sikayet-siparis /* Detail area: JS fills innerHTML */
+    #complaintDetail a{
+      color: var(--info);
+      text-decoration:none;
+      word-break:break-all;
+    }#tab-sikayet-siparis #complaintDetail a:hover{ text-decoration:underline; }#tab-sikayet-siparis /* Draft */
+    .draftArea{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      min-height:0;
+    }#tab-sikayet-siparis textarea{
+      min-height: 140px;
+      resize: vertical;
+      line-height:1.35;
+      font-size:13px;
+    }#tab-sikayet-siparis #complaintsList table th, #tab-sikayet-siparis #complaintsList table td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.08);font-size:12px;text-align:left;}#tab-sikayet-siparis #complaintsList table tbody tr{cursor:pointer;}#tab-sikayet-siparis #complaintsList table tbody tr.active{background:rgba(106,167,255,.14);}#tab-sikayet-siparis /* Footer */
+    .footer{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background: rgba(255,255,255,.03);
+      color: var(--muted);
+      font-size:11px;
+      box-shadow: var(--shadow);
+    }#tab-sikayet-siparis .kbd{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono";
+      padding:2px 6px;
+      border-radius:8px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.18);
+      color: var(--text);
+      font-size:11px;
+    }#tab-sikayet-siparis /* Responsive */
+    @media (max-width: 820px){#tab-sikayet-siparis .controls{ grid-template-columns: 1fr; }#tab-sikayet-siparis .main{ grid-template-columns: 1fr; }#tab-sikayet-siparis textarea{ min-height: 160px; }
+    }
+  
+</style>
 </head>
 
 <body data-page="sidepanel">
@@ -672,14 +1240,12 @@
 
   <!-- Bölüm C: Sekmeler -->
   <nav class="tabbar" aria-label="Sekmeler">
-    <button class="tab tab-btn" data-tab="tab-sikayet-siparis" aria-selected="true" type="button">Şikayet Sipariş</button>
-    <button class="tab" data-tab="orders" aria-selected="false" type="button">Sipariş Yönetimi</button>
+    <button class="tab tab-btn" data-tab="tab-sikayet-siparis" aria-selected="false" type="button">Şikayet Sipariş</button>
+    <button class="tab" data-tab="orders" aria-selected="true" type="button">Sipariş Yönetimi</button>
     <button class="tab" data-tab="market" aria-selected="false" type="button">Rakip ve Pazar Analizi</button>
     <button class="tab" data-tab="complaints" aria-selected="false" type="button">Müşteri Şikayet Yönetimi</button>
-    <button class="tab" data-tab="rules" aria-selected="false" type="button">Kurallar ve Öğrenme Merkezi</button>
-    <button class="tab" data-tab="reports" aria-selected="false" type="button">Raporlar ve Otomasyon</button>
-    <button class="tab" data-tab="files" aria-selected="false" type="button">Chrome Eklenti Dosyaları</button>
-    <button class="tab" data-tab="system" aria-selected="false" type="button">Sistem ve Entegrasyon</button>
+<button class="tab" data-tab="reports" aria-selected="false" type="button">Raporlar ve Otomasyon</button>
+<button class="tab" data-tab="system" aria-selected="false" type="button">Sistem ve Entegrasyon</button>
   </nav>
 
   <!-- Bölüm D: Ana Yerleşim -->
@@ -979,31 +1545,155 @@
         </section>
 
         <section id="tab-sikayet-siparis" class="tabpanel tab-panel" data-tabpanel="tab-sikayet-siparis" hidden>
-          <iframe src="ss.html" style="width:100%;height:100%;border:0;"></iframe>
-        </section>
+  <div class="app ss-app" id="ssRoot">
+    <!-- Header -->
+    <div class="header">
+      <div class="titleWrap">
+        <div class="logo" aria-hidden="true"><span>ŞS</span></div>
+        <div class="titles">
+          <h1>Şikayet & Sipariş Yönetim Paneli</h1>
+          <p>Hesap.com.tr tarama • Mesaj akışı • Anabayınız kontrol • Çözüm bildir</p>
+          <p style="margin:4px 0 0;font-size:11px;color:var(--muted2)">Not: 4. görsel repo içinde olmadığı için düzen ana bölgeler baz alınarak eşlendi.</p>
+        </div>
+      </div>
+      <div class="headerRight">
+        <div class="pill" title="Base URL sabittir">Base: hesap.com.tr</div>
+        <div class="pill" id="ssStats">Kayıt: 0 • SLA Risk: 0</div>
+      </div>
+    </div>
 
-        <!-- Sekme: Kurallar -->
-        <section class="tabpanel" data-tabpanel="rules" hidden>
-          <div class="cards">
-            <div class="card">
-              <h3>Öğrenme Kuyruğu</h3>
-              <p>Yeni eşleşmeleri onayla; 3 onay sonrası kalıcı kurala dönüşür.</p>
-              <div class="row">
-                <button class="btn primary" id="btnRuleApprove" type="button">Onayla</button>
-                <button class="btn" id="btnRuleReject" type="button">Reddet</button>
-                <button class="btn primary" id="btnRuleOverride" type="button">Manuel Değiştir</button>
-                <button class="btn" id="btnRuleTest" type="button">Kural Test</button>
-              </div>
-              <div class="hint">Not: AI sadece öneri üretir, otomatik kaydetmez.</div>
+    <!-- Controls -->
+    <div class="controls">
+      <!-- Left: Scan + Filters -->
+      <div class="panel">
+        <div class="panelHeader">
+          <h2>Tarama Ayarları</h2>
+          <div class="pill" title="URL biçimi: /p/sattigim-ilanlar?page=N">…?page=N</div>
+        </div>
+        <div class="panelBody">
+          <div class="grid2">
+            <div class="field">
+              <div class="label">Kaç sayfa taransın?</div>
+              <input id="ssInpPages" type="number" min="1" max="200" value="5" />
             </div>
-
-            <div class="card">
-              <h3>Boş Durum</h3>
-              <div class="empty">
-                Henüz öğrenme kuyruğu yok. Yeni desen bulununca burada görünür.
-              </div>
+            <div class="field">
+              <div class="label">Tarama hızı (1 yavaş • 10 hızlı)</div>
+              <input id="ssRngSpeed" type="range" min="1" max="10" value="5" />
             </div>
           </div>
+
+          <div style="height:10px"></div>
+
+          <div class="field">
+            <div class="label">Arama (SMM / kullanıcı / durum / platform / servis)</div>
+            <input id="ssInpSearch" type="text" placeholder="örn: 7410554, tiktok, tamamlandı, iade..." />
+          </div>
+
+          <div style="height:12px"></div>
+
+          <div class="btnRow">
+            <button class="btn primary" id="ssBtnScan">Taramayı Başlat</button>
+            <button class="btn danger" id="ssBtnStop">Durdur</button>
+            <button class="btn" id="ssBtnSolution">Çözüm Öner</button>
+            <button class="btn warn" id="ssBtnEscalate">Eskale</button>
+            <button class="btn danger" id="ssBtnClose">Kapat</button>
+          </div>
+
+          <div class="hint">
+            <b>İpucu:</b> Base URL sabit: <span class="kbd">https://hesap.com.tr/p/sattigim-ilanlar</span><br/>
+            Taramada otomatik: <span class="kbd">?page=1</span>, <span class="kbd">?page=2</span> ...
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Actions -->
+      <div class="panel">
+        <div class="panelHeader">
+          <h2>Operasyon Araçları</h2>
+          <div class="pill" title="Seçili kayıt üzerinden çalışır">Seçili kayıt</div>
+        </div>
+        <div class="panelBody">
+          <div class="btnRow">
+            <button class="btn good" id="ssBtnDraft">Taslak Üret</button>
+            <button class="btn" id="ssBtnCopyDraft">Taslağı Kopyala</button>
+            <button class="btn primary" id="ssBtnOpenMessage">Mesaj Akışını Aç</button>
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div class="btnRow">
+            <!-- Bu iki buton JS içinde bind edildi (varsa) -->
+            <button class="btn primary" id="ssBtnAnabayiCheck">Anabayınız Kontrol + Cevap</button>
+            <button class="btn warn" id="ssBtnCozumBildir">Çözüm Bildir (Hesap)</button>
+          </div>
+
+          <div class="hint" id="ssActionHint">
+            Servis ID gizleme kontrolü: —
+          </div>
+
+          <div class="hint">
+            <b>Kısayol önerisi:</b> Tarama sonrası soldan seç → taslak üret → mesaj akışı → çözüm bildir.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+      <!-- List -->
+      <div class="panel listWrap">
+        <div class="panelHeader">
+          <h2>Şikayet Kayıtları</h2>
+          <div class="pill" title="Listeden tıklayıp detay aç">Sol liste</div>
+        </div>
+        <div class="scroll" id="ssComplaintsList">
+          <div class="empty">Henüz kayıt yok. “Taramayı Başlat” ile başla.</div>
+        </div>
+      </div>
+
+      <!-- Detail + Draft -->
+      <div class="panel detailWrap">
+        <div class="panelHeader">
+          <h2>Detay & Taslak</h2>
+          <div class="pill" title="Detaylar sağ panelde görünür">Sağ panel</div>
+        </div>
+        <div class="panelBody draftArea" style="min-height:0">
+          <div class="panel" style="border-radius:14px; border-color: var(--line); background: rgba(0,0,0,.10); box-shadow:none;">
+            <div class="panelHeader" style="border-bottom-color: var(--line);">
+              <h2>Detay</h2>
+              <div class="pill">Linkler tıklanabilir</div>
+            </div>
+            <div class="scroll" id="ssComplaintDetail" style="max-height: 250px;">
+              <div class="empty">Detay görmek için soldan kayıt seçin.</div>
+            </div>
+          </div>
+
+          <div class="panel" style="border-radius:14px; border-color: var(--line); background: rgba(0,0,0,.10); box-shadow:none;">
+            <div class="panelHeader" style="border-bottom-color: var(--line);">
+              <h2>Taslak Mesaj</h2>
+              <div class="pill">Kopyala → Gönder</div>
+            </div>
+            <div class="panelBody">
+              <textarea id="ssDraftText" placeholder="Taslak burada oluşur..."></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div>
+        <b>Durum:</b> Sidepanel UI hazır • Kayıtlar <span class="kbd">chrome.storage.local</span> içinde saklanır.
+      </div>
+      <div>
+        <span class="kbd">Scan</span> → <span class="kbd">Draft</span> → <span class="kbd">Message</span> → <span class="kbd">Cozum</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SS modülü sidepanel.js içinde init ediliyor. -->
+  
         </section>
 
         <!-- Sekme: Raporlar -->
@@ -1025,76 +1715,6 @@
               <h3>Boş Durum</h3>
               <div class="empty">
                 Henüz rapor yok. “Günlük Rapor Üret” ile başlayabilirsin.
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Sekme: Dosyalar -->
-        <section class="tabpanel" data-tabpanel="files" hidden>
-          <div class="cards">
-            <div class="card">
-              <h3>Chrome Eklenti Dosyaları</h3>
-              <p>
-                Bu sekme bir “çalışma alanı” gibi çalışır: içe aktar, düzenle, dışa aktar.
-                Kurulu eklentiyi yerinde değiştirmek mümkün değildir.
-              </p>
-              <div class="row">
-                <button class="btn primary" id="btnWorkspaceImport" type="button">İçe Aktar (ZIP)</button>
-                <button class="btn" id="btnWorkspaceExport" type="button">Dışa Aktar (ZIP)</button>
-                <button class="btn" id="btnWorkspaceValidate" type="button">manifest.json Doğrula</button>
-                <button class="btn" id="btnWorkspaceHistory" type="button">Değişiklik Geçmişi</button>
-              </div>
-              <div class="hint">
-                İpucu: Bu sekmede dosyaları düzenleyip yeni ZIP çıkarırsın.
-              </div>
-            </div>
-
-            <div class="card">
-              <h3>Çalışma Alanı</h3>
-              <p>Sol: dosya ağacı • Orta: kod düzenleyici • Sağ: Puter AI yardımcısı</p>
-
-              <div class="workspace" aria-label="Çalışma alanı yerleşimi">
-                <!-- Sol: Dosya ağacı -->
-                <div class="filetree" aria-label="Dosya ağacı">
-                  <div class="filetreehead">
-                    <input id="fileFilter" type="text" placeholder="Dosya ara (ör. manifest)..." />
-                  </div>
-                  <div class="filelist" id="fileList">
-                    <div class="empty">
-                      Henüz çalışma alanı yok. “İçe Aktar (ZIP)” ile başlayabilirsin.
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Orta: Kod düzenleyici -->
-                <div class="editor" aria-label="Kod düzenleyici">
-                  <div class="editorhead">
-                    <div class="left">
-                      <span class="fname" id="activeFileName">Aktif dosya: —</span>
-                      <span class="badge" id="activeFileBadge" hidden>—</span>
-                    </div>
-                    <div class="row">
-                      <button class="btn" id="btnUndo" type="button">Geri Al</button>
-                      <button class="btn" id="btnRedo" type="button">İleri Al</button>
-                      <button class="btn primary" id="btnSaveFile" type="button">Kaydet</button>
-                      <button class="btn" id="btnSaveAll" type="button">Tümünü Kaydet</button>
-                    </div>
-                  </div>
-
-                  <div class="editorbody">
-                    <textarea class="code" id="codeEditor" spellcheck="false" placeholder="Bir dosya seçince içerik burada görünecek."></textarea>
-                    <div class="row">
-                      <button class="btn" id="btnFind" type="button">Bul</button>
-                      <button class="btn" id="btnReplace" type="button">Değiştir</button>
-                      <button class="btn" id="btnFormat" type="button">Biçimlendir</button>
-                      <button class="btn" id="btnJsonValidate" type="button">JSON Doğrula</button>
-                    </div>
-                    <div class="edhint" id="editorHint">
-                      Not: “manifest.json” için JSON doğrulama ve minimum izin uyarısı gösterilir.
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -1138,6 +1758,7 @@
   <script src="smm.js"></script>
   <script src="sikayet.js"></script>
   <script src="footer.js"></script>
+  <script src="sidepanel.js"></script>
   <script src="bundle.js"></script>
 </body>
 </html>
