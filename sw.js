@@ -17,13 +17,12 @@ const LOCKED_DEFAULTS = Object.freeze({
 
 const TARGETS = Object.freeze({
   hesapOrders: [
-    "https://hesap.com.tr/p/sattigim-ilanlar",
-    "https://hesap.com.tr/p/sattigim-ilanlar?status=pending",
-    "https://hesap.com.tr/p/sattigim-ilanlar?status=processing",
-    "https://hesap.com.tr/p/sattigim-ilanlar?status=completed",
-    "https://hesap.com.tr/p/sattigim-ilanlar?status=cancelled",
-    "https://hesap.com.tr/p/sattigim-ilanlar?status=returnprocess",
-    "https://hesap.com.tr/p/sattigim-ilanlar?status=problematic"
+    "https://hesap.com.tr/p/sattigim-ilanlar?status=pending&page=1",
+    "https://hesap.com.tr/p/sattigim-ilanlar?status=processing&page=1",
+    "https://hesap.com.tr/p/sattigim-ilanlar?status=completed&page=1",
+    "https://hesap.com.tr/p/sattigim-ilanlar?status=cancelled&page=1",
+    "https://hesap.com.tr/p/sattigim-ilanlar?status=returnprocess&page=1",
+    "https://hesap.com.tr/p/sattigim-ilanlar?status=problematic&page=1"
   ],
   smmOrders: [
     "https://anabayiniz.com/orders",
