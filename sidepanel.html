@@ -279,6 +279,8 @@
       line-height:1.35;
     }
     .mainbody{padding:14px;}
+    #tab-sikayet-siparis{padding:0;min-height:960px;}
+    #tab-sikayet-siparis iframe{display:block;width:100%;height:960px;border:0;border-radius:14px;background:transparent;}
     .cards{
       display:grid;
       grid-template-columns: 1fr;
@@ -977,7 +979,7 @@
         </section>
 
         <section id="tab-sikayet-siparis" class="tabpanel tab-panel" data-tabpanel="tab-sikayet-siparis" hidden>
-          <iframe src="sikayet_siparis.html" style="width:100%;height:100%;border:0;"></iframe>
+          <iframe src="ss.html" style="width:100%;height:100%;border:0;"></iframe>
         </section>
 
         <!-- Sekme: Kurallar -->
@@ -1135,9 +1137,6 @@
   <script src="siparis.js"></script>
   <script src="smm.js"></script>
   <script src="sikayet.js"></script>
-  <script type="module">
-    import "./sikayet_siparis.js";
-  </script>
   <script src="footer.js"></script>
   <script src="bundle.js"></script>
 </body>
