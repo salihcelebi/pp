@@ -27,8 +27,9 @@
       --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
     }
     *{box-sizing:border-box}
-    html,body{height:100%}
+    html,body,#root{height:100%;width:100vw;margin:0;padding:0}
     body{
+      width:100vw;
       margin:0;
       background: radial-gradient(900px 500px at 10% 0%, rgba(110,168,255,.22), transparent 55%),
                   radial-gradient(700px 480px at 90% 10%, rgba(155,123,255,.18), transparent 55%),
@@ -213,10 +214,12 @@
       display:flex;
       gap:8px;
       padding:12px 14px 0;
+      flex-wrap:wrap;
+      overflow-x:auto;
     }
     .tab{
       flex:1;
-      min-width:0;
+      min-width:170px;
       border:1px solid var(--line);
       background: rgba(15,22,48,.55);
       border-radius: 14px;
@@ -247,18 +250,21 @@
 
     /* Bölüm 4: Ana Yerleşim */
     .layout{
-      display:grid;
-      grid-template-columns: 1fr 360px;
+      display:flex;
+      flex-direction:column;
       gap:12px;
       padding:12px 14px 16px;
+      width:100%;
+      max-width:none;
     }
-    .main, .right{
+    .main{
       border:1px solid var(--line);
       background: rgba(15,22,48,.55);
       border-radius: var(--radius2);
       box-shadow: var(--shadow);
       overflow:hidden;
-      min-height: 560px;
+      min-height: 0;
+      width:100%;
     }
     .mainheader{
       padding:14px 14px 12px;
@@ -278,9 +284,10 @@
       font-size:12px;
       line-height:1.35;
     }
-    .mainbody{padding:14px;}
+    .mainbody{padding:14px;flex:1;min-height:0;overflow:hidden;}
     .cards{
       display:grid;
+      max-width:none;
       grid-template-columns: 1fr;
       gap:12px;
     }
@@ -670,13 +677,11 @@
 
   <!-- Bölüm C: Sekmeler -->
   <nav class="tabbar" aria-label="Sekmeler">
-    <button class="tab tab-btn" data-tab="tab-sikayet-siparis" aria-selected="true" type="button">Şikayet Sipariş</button>
-    <button class="tab" data-tab="orders" aria-selected="false" type="button">Sipariş Yönetimi</button>
+    <button class="tab" data-tab="orders" aria-selected="true" type="button">Sipariş Yönetimi</button>
+    <button class="tab tab-btn" data-tab="tab-sikayet-siparis" aria-selected="false" type="button">Şikayet Sipariş</button>
     <button class="tab" data-tab="market" aria-selected="false" type="button">Rakip ve Pazar Analizi</button>
     <button class="tab" data-tab="complaints" aria-selected="false" type="button">Müşteri Şikayet Yönetimi</button>
-    <button class="tab" data-tab="rules" aria-selected="false" type="button">Kurallar ve Öğrenme Merkezi</button>
     <button class="tab" data-tab="reports" aria-selected="false" type="button">Raporlar ve Otomasyon</button>
-    <button class="tab" data-tab="files" aria-selected="false" type="button">Chrome Eklenti Dosyaları</button>
     <button class="tab" data-tab="system" aria-selected="false" type="button">Sistem ve Entegrasyon</button>
   </nav>
 
@@ -976,33 +981,35 @@
           </div>
         </section>
 
+
         <section id="tab-sikayet-siparis" class="tabpanel tab-panel" data-tabpanel="tab-sikayet-siparis" hidden>
-          <iframe src="sikayet_siparis.html" style="width:100%;height:100%;border:0;"></iframe>
-        </section>
-
-        <!-- Sekme: Kurallar -->
-        <section class="tabpanel" data-tabpanel="rules" hidden>
-          <div class="cards">
+          <div id="ss-root" class="cards">
             <div class="card">
-              <h3>Öğrenme Kuyruğu</h3>
-              <p>Yeni eşleşmeleri onayla; 3 onay sonrası kalıcı kurala dönüşür.</p>
+              <h3>Şikayet & Sipariş Yönetim Paneli</h3>
+              <p>Hesap.com.tr tarama • Mesaj akışı • Anabayınız kontrol • Çözüm bildir</p>
               <div class="row">
-                <button class="btn primary" id="btnRuleApprove" type="button">Onayla</button>
-                <button class="btn" id="btnRuleReject" type="button">Reddet</button>
-                <button class="btn primary" id="btnRuleOverride" type="button">Manuel Değiştir</button>
-                <button class="btn" id="btnRuleTest" type="button">Kural Test</button>
+                <input id="inpComplaintPages" type="number" min="1" max="200" value="5" />
+                <input id="rngComplaintSpeed" type="range" min="1" max="10" value="5" />
+                <input id="inpComplaintSearch" type="text" placeholder="SMM / kullanıcı / durum / platform" />
+                <button class="btn primary" id="btnComplaintScan" type="button">Taramayı Başlat</button>
+                <button class="btn danger" id="btnComplaintStop" type="button">Durdur</button>
+                <button class="btn" id="btnComplaintSolution" type="button">Çözüm Öner</button>
+                <button class="btn" id="btnComplaintAnabayiCheck" type="button">Anabayınız Kontrol + Cevap</button>
+                <button class="btn" id="btnComplaintCozumBildir" type="button">Çözüm Bildir (Hesap)</button>
               </div>
-              <div class="hint">Not: AI sadece öneri üretir, otomatik kaydetmez.</div>
             </div>
-
             <div class="card">
-              <h3>Boş Durum</h3>
-              <div class="empty">
-                Henüz öğrenme kuyruğu yok. Yeni desen bulununca burada görünür.
-              </div>
+              <h3>Şikayet Kayıtları</h3>
+              <div id="complaintsList" class="empty">Henüz kayıt yok. “Taramayı Başlat” ile başla.</div>
+            </div>
+            <div class="card">
+              <h3>Detay & Taslak</h3>
+              <div id="complaintDetail" class="empty">Detay görmek için soldan kayıt seçin.</div>
+              <textarea id="complaintDraftText" class="code" placeholder="Taslak burada oluşur..."></textarea>
             </div>
           </div>
         </section>
+
 
         <!-- Sekme: Raporlar -->
         <section class="tabpanel" data-tabpanel="reports" hidden>
@@ -1023,76 +1030,6 @@
               <h3>Boş Durum</h3>
               <div class="empty">
                 Henüz rapor yok. “Günlük Rapor Üret” ile başlayabilirsin.
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Sekme: Dosyalar -->
-        <section class="tabpanel" data-tabpanel="files" hidden>
-          <div class="cards">
-            <div class="card">
-              <h3>Chrome Eklenti Dosyaları</h3>
-              <p>
-                Bu sekme bir “çalışma alanı” gibi çalışır: içe aktar, düzenle, dışa aktar.
-                Kurulu eklentiyi yerinde değiştirmek mümkün değildir.
-              </p>
-              <div class="row">
-                <button class="btn primary" id="btnWorkspaceImport" type="button">İçe Aktar (ZIP)</button>
-                <button class="btn" id="btnWorkspaceExport" type="button">Dışa Aktar (ZIP)</button>
-                <button class="btn" id="btnWorkspaceValidate" type="button">manifest.json Doğrula</button>
-                <button class="btn" id="btnWorkspaceHistory" type="button">Değişiklik Geçmişi</button>
-              </div>
-              <div class="hint">
-                İpucu: Bu sekmede dosyaları düzenleyip yeni ZIP çıkarırsın.
-              </div>
-            </div>
-
-            <div class="card">
-              <h3>Çalışma Alanı</h3>
-              <p>Sol: dosya ağacı • Orta: kod düzenleyici • Sağ: Puter AI yardımcısı</p>
-
-              <div class="workspace" aria-label="Çalışma alanı yerleşimi">
-                <!-- Sol: Dosya ağacı -->
-                <div class="filetree" aria-label="Dosya ağacı">
-                  <div class="filetreehead">
-                    <input id="fileFilter" type="text" placeholder="Dosya ara (ör. manifest)..." />
-                  </div>
-                  <div class="filelist" id="fileList">
-                    <div class="empty">
-                      Henüz çalışma alanı yok. “İçe Aktar (ZIP)” ile başlayabilirsin.
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Orta: Kod düzenleyici -->
-                <div class="editor" aria-label="Kod düzenleyici">
-                  <div class="editorhead">
-                    <div class="left">
-                      <span class="fname" id="activeFileName">Aktif dosya: —</span>
-                      <span class="badge" id="activeFileBadge" hidden>—</span>
-                    </div>
-                    <div class="row">
-                      <button class="btn" id="btnUndo" type="button">Geri Al</button>
-                      <button class="btn" id="btnRedo" type="button">İleri Al</button>
-                      <button class="btn primary" id="btnSaveFile" type="button">Kaydet</button>
-                      <button class="btn" id="btnSaveAll" type="button">Tümünü Kaydet</button>
-                    </div>
-                  </div>
-
-                  <div class="editorbody">
-                    <textarea class="code" id="codeEditor" spellcheck="false" placeholder="Bir dosya seçince içerik burada görünecek."></textarea>
-                    <div class="row">
-                      <button class="btn" id="btnFind" type="button">Bul</button>
-                      <button class="btn" id="btnReplace" type="button">Değiştir</button>
-                      <button class="btn" id="btnFormat" type="button">Biçimlendir</button>
-                      <button class="btn" id="btnJsonValidate" type="button">JSON Doğrula</button>
-                    </div>
-                    <div class="edhint" id="editorHint">
-                      Not: “manifest.json” için JSON doğrulama ve minimum izin uyarısı gösterilir.
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -1135,9 +1072,6 @@
   <script src="siparis.js"></script>
   <script src="smm.js"></script>
   <script src="sikayet.js"></script>
-  <script type="module">
-    import "./sikayet_siparis.js";
-  </script>
   <script src="footer.js"></script>
   <script src="bundle.js"></script>
 </body>

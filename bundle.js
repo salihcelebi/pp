@@ -719,7 +719,7 @@
   const UI = {
     els: {},
     state: {
-      activeTab: 'tab-sikayet-siparis',
+      activeTab: 'orders',
       online: 'bilinmiyor',
       site: '—',
       aiModel: '',
@@ -898,7 +898,7 @@
         : 'Model seçince AI butonları açılır.';
 
       // Dosyalar sekmesi: kod bağlamı butonları
-      const filesTab = (this.state.activeTab === 'files');
+      const filesTab = false;
       const hasActiveFile = Boolean(this.state.workspace.activePath);
       const allowContext = enabled && filesTab && hasActiveFile;
 
@@ -980,16 +980,12 @@
     },
 
     setActiveTab(tabId) {
-      // Kaydetmeden çıkma uyarısı (dosyalar sekmesinden ayrılırken)
-      const leavingFiles = (this.state.activeTab === 'files' && tabId !== 'files');
-      if (leavingFiles && this.state.workspace.dirtyCount > 0) {
-        const ok = confirm('Kaydedilmemiş değişikliklerin var. Çıkmak istiyor musun?');
-        if (!ok) return;
-      }
-
       this.state.activeTab = tabId;
       this.renderTabs();
       this.renderAi(); // sekme değişince AI bağlamı güncellenir
+      if (tabId === 'tab-sikayet-siparis' && typeof window.__initSikayetSiparisModule === 'function') {
+        window.__initSikayetSiparisModule();
+      }
       Storage.setSync('ui_active_tab', tabId).catch(() => {});
     },
 
@@ -1437,7 +1433,7 @@
       ]
     };
 
-    const filesTab = (UI.state.activeTab === 'files');
+    const filesTab = false;
 
     const systemText = filesTab
       ? 'Sadece unified diff/patch üret. Açıklama, risk ve geri alma planı ekle. ' +
@@ -3831,3 +3827,23 @@ function bindEvents() {
   boot();
 })();
 /* ===== END options.js ===== */
+
+(function(){
+  if (typeof window === 'undefined') return;
+  let loaded = false;
+  window.__initSikayetSiparisModule = function(){
+    if (loaded) return;
+    loaded = true;
+    const run = () => {
+      const script = document.createElement('script');
+      script.src = 'sikayet_siparis.js';
+      script.defer = true;
+      document.body.appendChild(script);
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', run, { once:true });
+    } else {
+      run();
+    }
+  };
+})();

@@ -5,6 +5,7 @@
 
 (() => {
   'use strict';
+  const boot = () => {
   // MADDE 0 (Tek yerde şikayet mesaj anabayı çözüm akışı KODLANDI)
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -1462,4 +1463,12 @@
 
   // MADDE 1 (Sidepanel açılınca otomatik init yap KODLANDI)
   Sikayet.init().catch((e) => toast(String(e?.message || e)));
+
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  } else {
+    boot();
+  }
 })();
