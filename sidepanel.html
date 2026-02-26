@@ -235,6 +235,15 @@
       border-color: rgba(110,168,255,.45);
       background: linear-gradient(135deg, rgba(110,168,255,.18), rgba(155,123,255,.12));
     }
+    .tabbar .tab:nth-child(1){background:linear-gradient(135deg, rgba(255,92,119,.26), rgba(255,151,86,.18));border-color:rgba(255,92,119,.5);color:#ffe6ed;}
+    .tabbar .tab:nth-child(2){background:linear-gradient(135deg, rgba(110,168,255,.22), rgba(83,129,255,.15));}
+    .tabbar .tab:nth-child(3){background:linear-gradient(135deg, rgba(46,229,157,.20), rgba(79,189,255,.16));}
+    .tabbar .tab:nth-child(4){background:linear-gradient(135deg, rgba(255,200,87,.20), rgba(255,152,112,.14));}
+    .tabbar .tab:nth-child(5){background:linear-gradient(135deg, rgba(180,133,255,.2), rgba(120,89,255,.14));}
+    .tabbar .tab:nth-child(6){background:linear-gradient(135deg, rgba(121,220,255,.2), rgba(70,170,255,.14));}
+    .tabbar .tab:nth-child(7){background:linear-gradient(135deg, rgba(255,137,213,.20), rgba(189,114,255,.14));}
+    .tabbar .tab:nth-child(8){background:linear-gradient(135deg, rgba(161,255,118,.20), rgba(94,214,137,.14));}
+    .tabbar .tab:nth-child(1)[aria-selected="true"]{border-color:rgba(255,120,140,.85);box-shadow:0 0 0 1px rgba(255,120,140,.25) inset;}
 
     /* Bölüm 4: Ana Yerleşim */
     .layout{
@@ -270,6 +279,8 @@
       line-height:1.35;
     }
     .mainbody{padding:14px;}
+    #tab-sikayet-siparis{padding:0;min-height:960px;}
+    #tab-sikayet-siparis iframe{display:block;width:100%;height:960px;border:0;border-radius:14px;background:transparent;}
     .cards{
       display:grid;
       grid-template-columns: 1fr;
@@ -595,7 +606,7 @@
     body.complaint-only-fullscreen .right{display:none}
 
     /* Footer Puter AI (sidepanelden ayrı tema) */
-    .footer-ai{margin:12px 14px 16px; border:1px solid rgba(92,203,255,.28); background:linear-gradient(135deg, rgba(9,30,46,.95), rgba(22,46,78,.9)); border-radius:18px; padding:14px;}
+    .footer-ai{grid-column:1 / -1; margin:12px 0 0; border:1px solid rgba(92,203,255,.28); background:linear-gradient(135deg, rgba(9,30,46,.95), rgba(22,46,78,.9)); border-radius:18px; padding:14px;}
     .footer-ai .footer-head{display:flex;justify-content:space-between;align-items:center;gap:10px;}
     .footer-ai .footer-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}
     @media (max-width:980px){.footer-ai .footer-grid{grid-template-columns:1fr}}
@@ -661,10 +672,10 @@
 
   <!-- Bölüm C: Sekmeler -->
   <nav class="tabbar" aria-label="Sekmeler">
-    <button class="tab" data-tab="orders" aria-selected="true" type="button">Sipariş Yönetimi</button>
+    <button class="tab tab-btn" data-tab="tab-sikayet-siparis" aria-selected="true" type="button">Şikayet Sipariş</button>
+    <button class="tab" data-tab="orders" aria-selected="false" type="button">Sipariş Yönetimi</button>
     <button class="tab" data-tab="market" aria-selected="false" type="button">Rakip ve Pazar Analizi</button>
     <button class="tab" data-tab="complaints" aria-selected="false" type="button">Müşteri Şikayet Yönetimi</button>
-    <button class="tab tab-btn" data-tab="tab-sikayet-siparis" aria-selected="false" type="button">Şikayet Sipariş</button>
     <button class="tab" data-tab="rules" aria-selected="false" type="button">Kurallar ve Öğrenme Merkezi</button>
     <button class="tab" data-tab="reports" aria-selected="false" type="button">Raporlar ve Otomasyon</button>
     <button class="tab" data-tab="files" aria-selected="false" type="button">Chrome Eklenti Dosyaları</button>
@@ -732,7 +743,7 @@
                       <th>Tarih</th>
                       <th>Durum</th>
                       <th>Tutar (TL)</th>
-                      <th>Kullanıcı</th>
+                      <th>K.</th>
                     </tr>
                   </thead>
                   <tbody id="tblSiparisBody"></tbody>
@@ -968,7 +979,7 @@
         </section>
 
         <section id="tab-sikayet-siparis" class="tabpanel tab-panel" data-tabpanel="tab-sikayet-siparis" hidden>
-          <iframe src="sikayet_siparis.html" style="width:100%;height:100%;border:0;"></iframe>
+          <iframe src="ss.html" style="width:100%;height:100%;border:0;"></iframe>
         </section>
 
         <!-- Sekme: Kurallar -->
@@ -1103,51 +1114,8 @@
       </div>
     </section>
 
-    <!-- Footer: Puter AI -->
-    <section class="footer-ai" id="footerAiSection" aria-label="Puter AI footer alanı">
-      <div class="footer-head">
-        <div>
-          <h2 style="margin:0">Puter AI</h2>
-          <p style="margin:4px 0 0 0">Yalnızca analiz/öneri üretir. Uygulama için onay gerekir.</p>
-        </div>
-        <span class="kbd">Ctrl+Enter</span>
-      </div>
-      <div class="footer-grid">
-        <div class="field">
-          <label for="modelSelect">Model Seç (zorunlu)</label>
-          <select id="modelSelect">
-            <option value="" selected>Model seçmeden AI kullanılamaz</option>
-            <optgroup label="GPT (OpenAI)">
-              <option value="gpt-5.2">gpt-5.2</option><option value="gpt-5.1">gpt-5.1</option><option value="gpt-5">gpt-5</option><option value="gpt-5-mini">gpt-5-mini</option><option value="gpt-5-nano">gpt-5-nano</option>
-            </optgroup>
-            <optgroup label="Gemini (Google)">
-              <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview</option><option value="gemini-3-pro-preview">gemini-3-pro-preview</option><option value="gemini-3-flash-preview">gemini-3-flash-preview</option><option value="gemini-2.5-pro">gemini-2.5-pro</option><option value="gemini-2.5-flash">gemini-2.5-flash</option>
-            </optgroup>
-            <optgroup label="Claude (Anthropic)">
-              <option value="claude-sonnet-4-6">claude-sonnet-4-6</option><option value="claude-opus-4-6">claude-opus-4-6</option><option value="claude-opus-4-5">claude-opus-4-5</option><option value="claude-sonnet-4-5">claude-sonnet-4-5</option><option value="claude-haiku-4-5">claude-haiku-4-5</option>
-            </optgroup>
-          </select>
-          <div class="hint" id="modelHint">Model seçince AI butonları açılır.</div>
-        </div>
-        <div class="field">
-          <label for="aiPrompt">AI’ye Gönderilecek Not</label>
-          <textarea id="aiPrompt" placeholder="Örn: Bu sekmede kullanıcıyı en az tıklamayla hedefe ulaştır."></textarea>
-          <div class="small" id="aiContextInfo">Aktif dosya: —</div>
-        </div>
-      </div>
-      <div class="row" style="margin-top:10px;flex-wrap:wrap">
-        <button class="btn" id="cmdFix" type="button">Hata Düzelt</button><button class="btn" id="cmdRefactor" type="button">Düzenle</button><button class="btn" id="cmdI18n" type="button">Türkçeleştir</button><button class="btn" id="cmdPerf" type="button">Hızlandır</button><button class="btn" id="cmdSecurity" type="button">Güvenlik</button><button class="btn" id="cmdManifest" type="button">Manifest Doğrula</button>
-      </div>
-      <div class="row" style="margin-top:10px;flex-wrap:wrap">
-        <button class="btn" id="btnUseSelection" type="button" disabled>Seçili Kodu Kullan</button>
-        <button class="btn" id="btnUseWholeFile" type="button" disabled>Tüm Dosyayı Kullan</button>
-        <button class="btn primary" id="btnAiAnalyze" type="button" disabled>AI ile Analiz Et</button>
-        <button class="btn" id="btnAiPreviewPatch" type="button" disabled>Patch Önizle</button>
-        <button class="btn primary" id="btnAiApplyPatch" type="button" disabled>Patch Uygula</button>
-        <button class="btn" id="btnAiCopy" type="button" disabled>Öneriyi Kopyala</button>
-      </div>
-      <div class="small" id="aiResultHint" style="margin-top:10px;">Henüz öneri yok. Model seçip “AI ile Analiz Et”e bas.</div>
-    </section>
+    <!-- Footer: Puter AI (footer.html import) -->
+    <section id="footerAiSection" class="footer-ai" aria-label="Puter AI footer alanı" data-footer-import="footer.html"></section>
   </main>
 
   <div class="modal" id="patchModal" role="dialog" aria-modal="true" aria-label="Patch önizleme">
@@ -1169,9 +1137,6 @@
   <script src="siparis.js"></script>
   <script src="smm.js"></script>
   <script src="sikayet.js"></script>
-  <script type="module">
-    import "./sikayet_siparis.js";
-  </script>
   <script src="footer.js"></script>
   <script src="bundle.js"></script>
 </body>

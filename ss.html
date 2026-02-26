@@ -1,6 +1,6 @@
 <!-- =========================================================================
-     KOD ADI: sikayet_siparis.html
-     Amaç: sikayet_siparis.js dosyasını “sidepanel” içinde gelişmiş UI ile yönetmek
+     KOD ADI: ss.html
+     Amaç: ss.js dosyasını “sidepanel” içinde gelişmiş UI ile yönetmek
      Not: Body mutlaka data-page="sidepanel" olmalı (JS buna bakıyor).
      ====================================================================== -->
 <!doctype html>
@@ -302,6 +302,10 @@
       font-size:13px;
     }
 
+
+    #complaintsList table th, #complaintsList table td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.08);font-size:12px;text-align:left;}
+    #complaintsList table tbody tr{cursor:pointer;}
+    #complaintsList table tbody tr.active{background:rgba(106,167,255,.14);}
     /* Footer */
     .footer{
       display:flex;
@@ -337,7 +341,7 @@
 
 <!-- JS “sidepanel” kontrolü yaptığı için bu şart -->
 <body data-page="sidepanel">
-  <div class="app">
+  <div class="app" id="sikayet-siparis-root">
     <!-- Header -->
     <div class="header">
       <div class="titleWrap">
@@ -345,6 +349,7 @@
         <div class="titles">
           <h1>Şikayet & Sipariş Yönetim Paneli</h1>
           <p>Hesap.com.tr tarama • Mesaj akışı • Anabayınız kontrol • Çözüm bildir</p>
+          <p style="margin:4px 0 0;font-size:11px;color:var(--muted2)">Not: 4. görsel repo içinde olmadığı için düzen ana bölgeler baz alınarak eşlendi.</p>
         </div>
       </div>
       <div class="headerRight">
@@ -483,7 +488,7 @@
     </div>
   </div>
 
-  <!-- sikayet_siparis.js: Bu HTML’deki ID’lere bağlanır ve tüm akışı yönetir -->
-  <script src="sikayet_siparis.js"></script>
+  <!-- ss.js: Bu HTML’deki ID’lere bağlanır ve tüm akışı yönetir -->
+  <script src="ss.js"></script>
 </body>
 </html>
