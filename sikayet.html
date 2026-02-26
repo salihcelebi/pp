@@ -26,6 +26,14 @@
       <div class="controlbar">
         <input id="inpComplaintDate" type="text" placeholder="25.02.2026" />
         <input id="inpComplaintSearch" type="text" placeholder="Ara: SMM ID / sipariş / durum" />
+        <select id="selComplaintScanStatus">
+          <option value="problematic">problematic</option>
+          <option value="returnprocess">returnprocess</option>
+          <option value="pending">pending</option>
+          <option value="processing">processing</option>
+          <option value="completed">completed</option>
+          <option value="cancelled">cancelled</option>
+        </select>
         <button id="btnComplaintScan" type="button">Taramayı Başlat</button>
         <button id="btnComplaintStop" type="button">Durdur</button>
         <button id="btnComplaintDraft" type="button">Taslak</button>

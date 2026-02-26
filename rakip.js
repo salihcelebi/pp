@@ -7,7 +7,7 @@
   const BASE_URL = 'https://hesap.com.tr/p';
   const SOLD_BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar?';
   const ALLOWED_STATUSES = ['pending', 'processing', 'completed', 'cancelled', 'returnprocess', 'problematic'];
-  const DEFAULT_SOLD_STATUS = 'completed';
+  const DEFAULT_SOLD_STATUS = 'problematic';
   const BOUND = new Set();
 
   const PLATFORM_SERVICE_MAP = Object.freeze({
@@ -60,7 +60,7 @@
 
   async function startScan(){
     if(state.running) return;
-    const platform=String(ui.selPlatform?.value||'').trim(); if(!platform) return toast('Önce platform seç'); const service=String(ui.selService?.value||'hepsi').trim();
+    const platform=String(ui.selPlatform?.value||'').trim(); if(!platform) return toast('Önce platform seç'); const service=String(ui.selService?.value||'hepsi').trim(); const soldStatus=sanitizeStatus(ui.selSoldStatus?.value||DEFAULT_SOLD_STATUS);
     const minTxt=String(ui.inpQtyMin?.value||'').trim(); const maxTxt=String(ui.inpQtyMax?.value||'').trim(); const min=minTxt?Number(minTxt):null; const max=maxTxt?Number(maxTxt):null; if((minTxt&&(!Number.isFinite(min)||min<0))||(maxTxt&&(!Number.isFinite(max)||max<0))||(min!=null&&max!=null&&min>max)) return toast('Min/Max adet geçersiz');
     const maxPage=Math.max(1,Number(ui.inpPage?.value||1));
     state.running=true; state.shouldStop=false; state.pageCounts={}; statusLine('çalışıyor');
@@ -68,7 +68,7 @@
     for(let page=1; page<=maxPage; page++){
       if(state.shouldStop) break;
       const soldMode = true;
-      const url = soldMode ? buildPageUrl(SOLD_BASE_URL,page,DEFAULT_SOLD_STATUS) : buildPageUrl(`${BASE_URL}/${platform}/${service||'hepsi'}`,page);
+      const url = soldMode ? buildPageUrl(SOLD_BASE_URL,page,soldStatus) : buildPageUrl(`${BASE_URL}/${platform}/${service||'hepsi'}`,page);
       try {
         await navigate(tabId,url);
         const blocks = splitBlocks(await pageText(tabId));
@@ -91,9 +91,9 @@
   function testRegex(){ try{ const t=String(ui.regexInput?.value||'').trim(); if(!t){ if(ui.regexPreview) ui.regexPreview.textContent='Regex boş'; return; } const rx=new RegExp(t,'i'); const s=state.rows[0]?.ilanBasligi||'örnek'; if(ui.regexPreview) ui.regexPreview.textContent=rx.test(s)?'Regex eşleşti':'Regex eşleşmedi'; }catch(e){ if(ui.regexPreview) ui.regexPreview.textContent=`Regex hatası: ${String(e?.message||e)}`; toast('Geçersiz regex'); }}
   function toggleFullscreen(){ (byId('rakipRoot')||document.body).classList.toggle('rakip-fullscreen'); }
 
-  function bind(){ ui.selPlatform=byId('selPlatform'); ui.selService=byId('selService'); ui.inpQtyMin=byId('inpQtyMin'); ui.inpQtyMax=byId('inpQtyMax'); ui.inpPage=byId('inpRakipPageCount'); ui.inpSpeed=byId('inpScanSpeed'); ui.tblBody=byId('tblRakipBody'); ui.stats=byId('rakipStats'); ui.empty=byId('marketEmpty'); ui.statusLine=byId('rakipStatusLine'); ui.regexInput=byId('inpRakipRegex'); ui.regexPreview=byId('rakipRegexPreview');
+  function bind(){ ui.selPlatform=byId('selPlatform'); ui.selService=byId('selService'); ui.selSoldStatus=byId('selRakipSoldStatus'); ui.inpQtyMin=byId('inpQtyMin'); ui.inpQtyMax=byId('inpQtyMax'); ui.inpPage=byId('inpRakipPageCount'); ui.inpSpeed=byId('inpScanSpeed'); ui.tblBody=byId('tblRakipBody'); ui.stats=byId('rakipStats'); ui.empty=byId('marketEmpty'); ui.statusLine=byId('rakipStatusLine'); ui.regexInput=byId('inpRakipRegex'); ui.regexPreview=byId('rakipRegexPreview');
     bindOnce(ui.selPlatform,'change','platform',()=>{ if(ui.selService){ ui.selService.value=''; } renderServiceOptions(); });
-    bindOnce(byId('btnRakipStart'),'click','start',()=>startScan().catch((e)=>toast(String(e?.message||e)))); bindOnce(byId('btnRakipStop'),'click','stop',stop); bindOnce(byId('btnRakipClear'),'click','clear',clear); bindOnce(byId('btnRakipCopyMd'),'click','md',()=>{}); bindOnce(byId('btnRakipExportJson'),'click','json',exportJson); bindOnce(byId('btnRakipExportCsv'),'click','csv',exportCsv); bindOnce(byId('btnRakipRegexTest'),'click','regex',testRegex); bindOnce(byId('btnRakipRegexPanel'),'click','regex2',testRegex); bindOnce(byId('btnRakipFullscreen'),'click','full',toggleFullscreen); renderServiceOptions(); updateStats(); statusLine('hazır'); }
+    if(ui.selSoldStatus&&!ui.selSoldStatus.value) ui.selSoldStatus.value=DEFAULT_SOLD_STATUS; bindOnce(byId('btnRakipStart'),'click','start',()=>startScan().catch((e)=>toast(String(e?.message||e)))); bindOnce(byId('btnRakipStop'),'click','stop',stop); bindOnce(byId('btnRakipClear'),'click','clear',clear); bindOnce(byId('btnRakipCopyMd'),'click','md',()=>{}); bindOnce(byId('btnRakipExportJson'),'click','json',exportJson); bindOnce(byId('btnRakipExportCsv'),'click','csv',exportCsv); bindOnce(byId('btnRakipRegexTest'),'click','regex',testRegex); bindOnce(byId('btnRakipRegexPanel'),'click','regex2',testRegex); bindOnce(byId('btnRakipFullscreen'),'click','full',toggleFullscreen); renderServiceOptions(); updateStats(); statusLine('hazır'); }
 
   const Rakip={init:bind,startScan,stopScan:stop,clearTable:clear,exportJson,exportCsv,buildPageUrl,hashRow,speedDelayMs}; window.Patpat=window.Patpat||{}; window.Patpat.Rakip=Rakip; if(document.body?.dataset?.page==='sidepanel'||byId('btnRakipStart')) Rakip.init();
 })();
