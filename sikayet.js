@@ -4,8 +4,10 @@
   window.__SIKAYET_INIT__ = true;
   'use strict';
 
-  const SOLD_BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar';
-  const BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar';
+  const SOLD_BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar?';
+  const BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar?';
+  const ALLOWED_STATUSES = ['pending', 'processing', 'completed', 'cancelled', 'returnprocess', 'problematic'];
+  const DEFAULT_SCAN_STATUS = 'returnprocess';
   const KEY = 'patpat_complaints_v4';
   const BOUND = new Set();
 
@@ -17,13 +19,14 @@
   const RX_AMOUNT_15=[/\bToplam\s*Tutar\s*\n\s*([\d.,]+\s*TL)\b/i,/\bToplam\s*Tutar\s*([\d.,]+\s*TL)\b/i,/\bTutar\s*\n\s*([\d.,]+\s*TL)\b/i,/\bTutar[:\s]*([\d.,]+\s*TL)\b/i,/\bToplam[:\s]*([\d.,]+\s*TL)\b/i,/\bTotal\s*Amount[:\s]*([\d.,]+\s*TL)\b/i,/\bToplam\s*Ücret[:\s]*([\d.,]+\s*TL)\b/i,/\bÜcret[:\s]*([\d.,]+\s*TL)\b/i,/(?:^|\n)\s*([\d]{1,3}(?:\.[\d]{3})*(?:,[\d]{2})?)\s*TL\b/m,/\b([\d]{1,3}(?:\.[\d]{3})*(?:,[\d]{2})?)\s*TL\b/,/\b([\d]+(?:,[\d]{2})?)\s*TL\b/,/\b([\d]+(?:\.[\d]{3})*(?:,[\d]{2})?)\s*TL\b/,/TL\s*([\d.,]+)/i,/([\d.,]+)\s*(?:₺|TL)\b/i,/(?:Toplam\s*Tutar[\s\S]{0,40})\b([\d.,]+\s*(?:₺|TL))\b/i];
   const RX_REMAINING_15=[/\bSorun\s*Bildirildi\s*\(([^)]+)\)/i,/\((\d{1,2}\s*(?:sa|saat)\s*\d{1,2}\s*(?:dk|dakika)\s*kaldı)\)/i,/\((\d{1,2}\s*(?:sa|saat)\s*kaldı)\)/i,/\((\d{1,2}\s*(?:dk|dakika)\s*kaldı)\)/i,/\bKalan\s*Süre[:\s]*([^\n]{1,40})/i,/\bKalan[:\s]*([^\n]{1,40})/i,/\bRemaining[:\s]*([^\n]{1,40})/i,/\bSüre[:\s]*([^\n]{1,40})/i,/\(([^)]*kaldı[^)]*)\)/i,/\b(\d{1,2}\s*sa\s*\d{1,2}\s*dk)\b/i,/\b(\d{1,2}\s*saat\s*\d{1,2}\s*dakika)\b/i,/\b(\d{1,2}\s*saat)\b/i,/\b(\d{1,2}\s*dakika)\b/i,/\b(\d{1,2}\s*dk)\b/i,/\b([0-9]{1,2}:[0-9]{2}\s*kaldı)\b/i];
 
-  const state={rows:[],running:false,shouldStop:false,selectedId:''}; const ui={};
+  const state={rows:[],running:false,shouldStop:false,selectedId:'',scanStatus:DEFAULT_SCAN_STATUS}; const ui={};
   const byId=(id)=>document.getElementById(id); const toast=(m)=>window.__PatpatUI?.UI?.toast?.(m)||alert(m); const wait=(ms)=>new Promise((r)=>setTimeout(r,ms));
   async function getLocal(k){const x=await chrome.storage.local.get(k); return x[k];} async function setLocal(k,v){await chrome.storage.local.set({[k]:v});}
   function bindOnce(el,ev,key,fn){ if(!el) return; const k=`${key}:${ev}`; if(BOUND.has(k)) return; BOUND.add(k); el.addEventListener(ev,fn); }
   function pickFirstMatch(list,text,group=1){ for(const rx of list){ const m=String(text||'').match(rx); if(m) return (group===2&&m[2])?`${m[1]} ${m[2]}`:(m[group]||m[0]||''); } return ''; }
   function splitBlocks(pageText){ return String(pageText||'').split(/(?=Sipariş\s*#\d+)/i).map((x)=>x.trim()).filter(Boolean); }
-  function buildPageUrl(baseUrl,page){ return `${baseUrl}?page=${page}`; }
+  function sanitizeStatus(status=DEFAULT_SCAN_STATUS){ const s=String(status||'').trim().toLowerCase(); return ALLOWED_STATUSES.includes(s)?s:DEFAULT_SCAN_STATUS; }
+  function buildPageUrl(baseUrl,page,status=DEFAULT_SCAN_STATUS){ const safeStatus=sanitizeStatus(status); const safePage=Math.max(1,Math.floor(Number(page)||1)); return `${baseUrl}status=${safeStatus}&page=${safePage}`; }
   function todayTR(){ const d=new Date(); return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`; }
   function validateDate(v){ return /^\d{2}\.\d{2}\.\d{4}$/.test(String(v||'')); }
 
@@ -74,13 +77,15 @@
     state.running=true; state.shouldStop=false; console.log('scan start'); render();
     const tabId=await getActiveTabId();
     // zorunlu başlangıç ziyareti
-    await navigate(tabId, SOLD_BASE_URL);
+    const selectedScanStatus = sanitizeStatus(ui.selScanStatus?.value || state.scanStatus || DEFAULT_SCAN_STATUS);
+    state.scanStatus = selectedScanStatus;
+    await navigate(tabId, buildPageUrl(SOLD_BASE_URL,1,selectedScanStatus));
 
     const seen=new Set(state.rows.map((r)=>`${r.orderNo}|${r.smmId}|${r.dateTime}|${r.amountText}`));
     let page=1; let loops=0;
     while(!state.shouldStop && loops<250){
       loops++;
-      const url=buildPageUrl(SOLD_BASE_URL,page);
+      const url=buildPageUrl(SOLD_BASE_URL,page,selectedScanStatus);
       try{
         await navigate(tabId,url);
         const blocks=splitBlocks(await pageText(tabId));
@@ -119,7 +124,7 @@
   function stop(){ state.shouldStop=true; }
 
   async function load(){ const x=await getLocal(KEY); state.rows=Array.isArray(x)?x:[]; render(); }
-  function bind(){ ui.dateInput=byId('inpComplaintDate'); ui.daysInput=byId('inpComplaintDays'); ui.search=byId('inpComplaintSearch'); ui.stats=byId('complaintStats'); ui.list=byId('complaintsList'); ui.empty=byId('complaintEmpty'); ui.detail=byId('complaintDetail'); ui.selStatus=byId('selComplaintStatus'); ui.draft=byId('complaintDraftText'); if(ui.dateInput&&!ui.dateInput.value) ui.dateInput.value=todayTR(); if(ui.daysInput&&!ui.daysInput.value) ui.daysInput.value='7';
+  function bind(){ ui.dateInput=byId('inpComplaintDate'); ui.daysInput=byId('inpComplaintDays'); ui.search=byId('inpComplaintSearch'); ui.stats=byId('complaintStats'); ui.list=byId('complaintsList'); ui.empty=byId('complaintEmpty'); ui.detail=byId('complaintDetail'); ui.selStatus=byId('selComplaintStatus'); ui.selScanStatus=byId('selComplaintScanStatus'); ui.draft=byId('complaintDraftText'); if(ui.dateInput&&!ui.dateInput.value) ui.dateInput.value=todayTR(); if(ui.daysInput&&!ui.daysInput.value) ui.daysInput.value='7'; if(ui.selScanStatus&&!ui.selScanStatus.value) ui.selScanStatus.value=DEFAULT_SCAN_STATUS;
     bindOnce(byId('btnComplaintScan'),'click','scan',()=>scanComplaints().catch((e)=>toast(String(e?.message||e)))); bindOnce(byId('btnComplaintStop'),'click','stop',stop); bindOnce(byId('btnComplaintDraft'),'click','draft',draft); bindOnce(byId('btnComplaintSolution'),'click','sol',solution); bindOnce(byId('btnComplaintEscalate'),'click','esc',()=>escalate().catch(()=>{})); bindOnce(byId('btnComplaintClose'),'click','close',()=>closeComplaint().catch(()=>{})); bindOnce(byId('btnComplaintSaveStatus'),'click','save',()=>saveStatus().catch(()=>{})); bindOnce(ui.search,'input','search',render); render(); }
 
   const Sikayet={init:async()=>{bind(); await load();},scanComplaints,stopScan:stop,buildPageUrl}; window.Patpat=window.Patpat||{}; window.Patpat.Sikayet=Sikayet; if(document.body?.dataset?.page==='sidepanel'||byId('btnComplaintScan')) Sikayet.init();

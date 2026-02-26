@@ -364,7 +364,7 @@
       <div class="panel">
         <div class="panelHeader">
           <h2>Tarama Ayarları</h2>
-          <div class="pill" title="URL biçimi: /p/sattigim-ilanlar?page=N">…?page=N</div>
+          <div class="pill" title="URL biçimi: /p/sattigim-ilanlar?status=...&page=N">…?status=...&page=N</div>
         </div>
         <div class="panelBody">
           <div class="grid2">
@@ -385,6 +385,19 @@
             <input id="inpComplaintSearch" type="text" placeholder="örn: 7410554, tiktok, tamamlandı, iade..." />
           </div>
 
+          <div class="field">
+            <div class="label">Tarama Durumu (URL status parametresi)</div>
+            <select id="selComplaintScanStatus">
+              <option value="problematic">problematic</option>
+              <option value="returnprocess">returnprocess</option>
+              <option value="pending">pending</option>
+              <option value="processing">processing</option>
+              <option value="completed">completed</option>
+              <option value="cancelled">cancelled</option>
+              <option value="all">all (hepsi)</option>
+            </select>
+          </div>
+
           <div style="height:12px"></div>
 
           <div class="btnRow">
@@ -397,7 +410,7 @@
 
           <div class="hint">
             <b>İpucu:</b> Base URL sabit: <span class="kbd">https://hesap.com.tr/p/sattigim-ilanlar</span><br/>
-            Taramada otomatik: <span class="kbd">?page=1</span>, <span class="kbd">?page=2</span> ...
+            Taramada otomatik: <span class="kbd">?status=problematic&page=1</span>, <span class="kbd">?status=problematic&page=2</span> ...
           </div>
         </div>
       </div>

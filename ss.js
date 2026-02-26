@@ -21,26 +21,29 @@
   if (document.body?.dataset?.page !== 'sidepanel') return;
 
   // MADDE 1.4 (Tek sefer başlatma kilidi uygula KODLANDI)
-  if (window.__SIKAYET_INIT__) return;
+  if (window.__SS_INIT__) return;
 
   // MADDE 1.5 (Init kilidi koy ve strict modda çalış KODLANDI)
-  window.__SIKAYET_INIT__ = true;
+  window.__SS_INIT__ = true;
 
   // ───────────────────────────────────────────────────────────────────────────
   // 2) URL sabitleri ve sayfalama şablonları
   // ───────────────────────────────────────────────────────────────────────────
 
   // MADDE 2 (Base URL ve sayfalama şablonu kur KODLANDI)
-  const BASE_LIST_URL = 'https://hesap.com.tr/p/sattigim-ilanlar';
+  const BASE_LIST_URL = 'https://hesap.com.tr/p/sattigim-ilanlar?';
 
   // MADDE 2.1 (STATUS_URL sayfalama sabiti kur KODLANDI)
-  const STATUS_URL = `${BASE_LIST_URL}?page=`; // ör: ...?page=1
+  const ALLOWED_URL_STATUSES = ['pending', 'processing', 'completed', 'cancelled', 'returnprocess', 'problematic'];
+  const DEFAULT_SCAN_STATUS = 'problematic';
+
+  const STATUS_URL = `${BASE_LIST_URL}status=${DEFAULT_SCAN_STATUS}&page=`; // ör: ...?status=problematic&page=1
 
   // MADDE 2.2 (SOLD_BASE_URL sayfalama şablonu kur KODLANDI)
-  const SOLD_BASE_URL = `${BASE_LIST_URL}?page={PAGE}`;
+  const SOLD_BASE_URL = `${BASE_LIST_URL}status=${DEFAULT_SCAN_STATUS}&page={page}`;
 
   // MADDE 2.3 (BASE_URL sayfalama şablonu kur KODLANDI)
-  const BASE_URL = `${BASE_LIST_URL}?page={PAGE}`;
+  const BASE_URL = `${BASE_LIST_URL}status=${DEFAULT_SCAN_STATUS}&page={page}`;
 
   // MADDE 2.4 (Anabayınız sipariş arama URL’i kur KODLANDI)
   const ANABAYI_SEARCH = 'https://anabayiniz.com/orders?search=';
@@ -401,7 +404,8 @@
     stop: false,        // MADDE 15.1 (Stop flag ile taramayı durdur KODLANDI)
     selectedId: '',
     speed: 5,
-    running: false
+    running: false,
+    scanStatus: DEFAULT_SCAN_STATUS
   };
 
   const byId = (id) => document.getElementById(id);
@@ -439,8 +443,13 @@
   }
 
   // MADDE 2 (Sayfa URL’ini base + page ile üret KODLANDI)
-  function buildListPageUrl(page) {
-    return `${BASE_LIST_URL}?page=${Number(page || 1)}`;
+  function sanitizeUrlStatus(status = DEFAULT_SCAN_STATUS) {
+    const s = String(status || '').trim().toLowerCase();
+    return ALLOWED_URL_STATUSES.includes(s) ? s : DEFAULT_SCAN_STATUS;
+  }
+
+  function buildListPageUrl(page, status = DEFAULT_SCAN_STATUS) {
+    return `${BASE_LIST_URL}status=${sanitizeUrlStatus(status)}&page=${Math.max(1, Number(page || 1))}`;
   }
 
   // MADDE 4.3 (SMM id yakalama fonksiyonu kur KODLANDI)
@@ -760,6 +769,9 @@
     state.speed = Number(ui.speed?.value || 5);
 
     const maxPages = Math.max(1, Number(ui.pages?.value || 5));
+    const selectedStatus = String(ui.scanStatus?.value || DEFAULT_SCAN_STATUS).toLowerCase();
+    const statusList = selectedStatus === 'all' ? ALLOWED_URL_STATUSES : [sanitizeUrlStatus(selectedStatus)];
+    state.scanStatus = statusList[0] || DEFAULT_SCAN_STATUS;
 
     let tabId;
     try {
@@ -774,14 +786,16 @@
     const dedupSmm = buildDedupSmmSet(state.rows);
     const seen = buildSeenSet(state.rows);
 
-    for (let p = 1; p <= maxPages; p += 1) {
+    for (const scanStatus of statusList) {
+      if (state.stop) break;
+      for (let p = 1; p <= maxPages; p += 1) {
       if (state.stop) break;
 
       // MADDE 12.5 (Sayfa arası bekleme randomDelay uygula KODLANDI)
       await randomDelay();
 
       // MADDE 12.2 (Doğru sayfa URL’i ile gezin KODLANDI)
-      const url = `${STATUS_URL}${p}`; // https://hesap.com.tr/p/sattigim-ilanlar?page=1
+      const url = buildListPageUrl(p, scanStatus); // https://hesap.com.tr/p/sattigim-ilanlar?status=problematic&page=1
       await navigateAndWait(tabId, url);
 
       // MADDE 6 (Sayfa yüklendikten sonra içerik çek KODLANDI)
@@ -904,6 +918,7 @@
 
       // hiç ekleme yoksa taramayı erken bitir
       if (added === 0) break;
+    }
     }
 
     state.running = false;
@@ -1399,6 +1414,7 @@
     ui.pages = byId('inpComplaintPages');
     ui.speed = byId('rngComplaintSpeed');
     ui.search = byId('inpComplaintSearch');
+    ui.scanStatus = byId('selComplaintScanStatus');
     ui.stats = byId('complaintStats');
     ui.list = byId('complaintsList');
     ui.detail = byId('complaintDetail');
@@ -1435,6 +1451,8 @@
 
     ui.search?.addEventListener('input', render);
     ui.speed?.addEventListener('input', () => { state.speed = Number(ui.speed?.value || 5); });
+    ui.scanStatus?.addEventListener('change', () => { state.scanStatus = sanitizeUrlStatus(ui.scanStatus?.value); });
+    if (ui.scanStatus && !ui.scanStatus.value) ui.scanStatus.value = DEFAULT_SCAN_STATUS;
   }
 
   // ───────────────────────────────────────────────────────────────────────────

@@ -5,7 +5,9 @@
   'use strict';
 
   const BASE_URL = 'https://hesap.com.tr/p';
-  const SOLD_BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar';
+  const SOLD_BASE_URL = 'https://hesap.com.tr/p/sattigim-ilanlar?';
+  const ALLOWED_STATUSES = ['pending', 'processing', 'completed', 'cancelled', 'returnprocess', 'problematic'];
+  const DEFAULT_SOLD_STATUS = 'problematic';
   const BOUND = new Set();
 
   const PLATFORM_SERVICE_MAP = Object.freeze({
@@ -28,7 +30,8 @@
   const byId=(id)=>document.getElementById(id); const toast=(m)=>window.__PatpatUI?.UI?.toast?.(m)||alert(m); const wait=(ms)=>new Promise((r)=>setTimeout(r,ms));
   function bindOnce(el,ev,key,fn){ if(!el)return; const k=`${key}:${ev}`; if(BOUND.has(k)) return; BOUND.add(k); el.addEventListener(ev,fn);} function pickFirstMatch(list,text,g=1){ for(const rx of list){ const m=String(text||'').match(rx); if(m) return g===2&&m[2]?`${m[1]} ${m[2]}`:(m[g]||m[0]||''); } return ''; }
   function splitBlocks(pageText){ return String(pageText||'').split(/(?=Sipariş\s*#\d+)/i).map((x)=>x.trim()).filter(Boolean); }
-  function buildPageUrl(base,page){ return `${base}?page=${page}`; }
+  function sanitizeStatus(status=DEFAULT_SOLD_STATUS){ const s=String(status||'').trim().toLowerCase(); return ALLOWED_STATUSES.includes(s)?s:DEFAULT_SOLD_STATUS; }
+  function buildPageUrl(base,page,status=DEFAULT_SOLD_STATUS){ const safePage=Math.max(1,Math.floor(Number(page)||1)); if(base===SOLD_BASE_URL){ return `${base}status=${sanitizeStatus(status)}&page=${safePage}`; } return `${base}?page=${safePage}`; }
   function speedDelayMs(){ const n=Math.max(1,Math.min(100,Number(ui.inpSpeed?.value||3))); return Math.max(30,Math.round(1600/n)); }
 
   function renderServiceOptions(){
@@ -57,7 +60,7 @@
 
   async function startScan(){
     if(state.running) return;
-    const platform=String(ui.selPlatform?.value||'').trim(); if(!platform) return toast('Önce platform seç'); const service=String(ui.selService?.value||'hepsi').trim();
+    const platform=String(ui.selPlatform?.value||'').trim(); if(!platform) return toast('Önce platform seç'); const service=String(ui.selService?.value||'hepsi').trim(); const soldStatus=sanitizeStatus(ui.selSoldStatus?.value||DEFAULT_SOLD_STATUS);
     const minTxt=String(ui.inpQtyMin?.value||'').trim(); const maxTxt=String(ui.inpQtyMax?.value||'').trim(); const min=minTxt?Number(minTxt):null; const max=maxTxt?Number(maxTxt):null; if((minTxt&&(!Number.isFinite(min)||min<0))||(maxTxt&&(!Number.isFinite(max)||max<0))||(min!=null&&max!=null&&min>max)) return toast('Min/Max adet geçersiz');
     const maxPage=Math.max(1,Number(ui.inpPage?.value||1));
     state.running=true; state.shouldStop=false; state.pageCounts={}; statusLine('çalışıyor');
@@ -65,7 +68,7 @@
     for(let page=1; page<=maxPage; page++){
       if(state.shouldStop) break;
       const soldMode = true;
-      const url = soldMode ? buildPageUrl(SOLD_BASE_URL,page) : buildPageUrl(`${BASE_URL}/${platform}/${service||'hepsi'}`,page);
+      const url = soldMode ? buildPageUrl(SOLD_BASE_URL,page,soldStatus) : buildPageUrl(`${BASE_URL}/${platform}/${service||'hepsi'}`,page);
       try {
         await navigate(tabId,url);
         const blocks = splitBlocks(await pageText(tabId));
@@ -88,9 +91,9 @@
   function testRegex(){ try{ const t=String(ui.regexInput?.value||'').trim(); if(!t){ if(ui.regexPreview) ui.regexPreview.textContent='Regex boş'; return; } const rx=new RegExp(t,'i'); const s=state.rows[0]?.ilanBasligi||'örnek'; if(ui.regexPreview) ui.regexPreview.textContent=rx.test(s)?'Regex eşleşti':'Regex eşleşmedi'; }catch(e){ if(ui.regexPreview) ui.regexPreview.textContent=`Regex hatası: ${String(e?.message||e)}`; toast('Geçersiz regex'); }}
   function toggleFullscreen(){ (byId('rakipRoot')||document.body).classList.toggle('rakip-fullscreen'); }
 
-  function bind(){ ui.selPlatform=byId('selPlatform'); ui.selService=byId('selService'); ui.inpQtyMin=byId('inpQtyMin'); ui.inpQtyMax=byId('inpQtyMax'); ui.inpPage=byId('inpRakipPageCount'); ui.inpSpeed=byId('inpScanSpeed'); ui.tblBody=byId('tblRakipBody'); ui.stats=byId('rakipStats'); ui.empty=byId('marketEmpty'); ui.statusLine=byId('rakipStatusLine'); ui.regexInput=byId('inpRakipRegex'); ui.regexPreview=byId('rakipRegexPreview');
+  function bind(){ ui.selPlatform=byId('selPlatform'); ui.selService=byId('selService'); ui.selSoldStatus=byId('selRakipSoldStatus'); ui.inpQtyMin=byId('inpQtyMin'); ui.inpQtyMax=byId('inpQtyMax'); ui.inpPage=byId('inpRakipPageCount'); ui.inpSpeed=byId('inpScanSpeed'); ui.tblBody=byId('tblRakipBody'); ui.stats=byId('rakipStats'); ui.empty=byId('marketEmpty'); ui.statusLine=byId('rakipStatusLine'); ui.regexInput=byId('inpRakipRegex'); ui.regexPreview=byId('rakipRegexPreview');
     bindOnce(ui.selPlatform,'change','platform',()=>{ if(ui.selService){ ui.selService.value=''; } renderServiceOptions(); });
-    bindOnce(byId('btnRakipStart'),'click','start',()=>startScan().catch((e)=>toast(String(e?.message||e)))); bindOnce(byId('btnRakipStop'),'click','stop',stop); bindOnce(byId('btnRakipClear'),'click','clear',clear); bindOnce(byId('btnRakipCopyMd'),'click','md',()=>{}); bindOnce(byId('btnRakipExportJson'),'click','json',exportJson); bindOnce(byId('btnRakipExportCsv'),'click','csv',exportCsv); bindOnce(byId('btnRakipRegexTest'),'click','regex',testRegex); bindOnce(byId('btnRakipRegexPanel'),'click','regex2',testRegex); bindOnce(byId('btnRakipFullscreen'),'click','full',toggleFullscreen); renderServiceOptions(); updateStats(); statusLine('hazır'); }
+    if(ui.selSoldStatus&&!ui.selSoldStatus.value) ui.selSoldStatus.value=DEFAULT_SOLD_STATUS; bindOnce(byId('btnRakipStart'),'click','start',()=>startScan().catch((e)=>toast(String(e?.message||e)))); bindOnce(byId('btnRakipStop'),'click','stop',stop); bindOnce(byId('btnRakipClear'),'click','clear',clear); bindOnce(byId('btnRakipCopyMd'),'click','md',()=>{}); bindOnce(byId('btnRakipExportJson'),'click','json',exportJson); bindOnce(byId('btnRakipExportCsv'),'click','csv',exportCsv); bindOnce(byId('btnRakipRegexTest'),'click','regex',testRegex); bindOnce(byId('btnRakipRegexPanel'),'click','regex2',testRegex); bindOnce(byId('btnRakipFullscreen'),'click','full',toggleFullscreen); renderServiceOptions(); updateStats(); statusLine('hazır'); }
 
   const Rakip={init:bind,startScan,stopScan:stop,clearTable:clear,exportJson,exportCsv,buildPageUrl,hashRow,speedDelayMs}; window.Patpat=window.Patpat||{}; window.Patpat.Rakip=Rakip; if(document.body?.dataset?.page==='sidepanel'||byId('btnRakipStart')) Rakip.init();
 })();
