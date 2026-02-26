@@ -31,16 +31,16 @@
   // ───────────────────────────────────────────────────────────────────────────
 
   // MADDE 2 (Base URL ve sayfalama şablonu kur KODLANDI)
-  const BASE_LIST_URL = 'https://hesap.com.tr/p/sattigim-ilanlar';
+  const BASE_LIST_URL = 'https://hesap.com.tr/p/sattigim-ilanlar?';
 
   // MADDE 2.1 (STATUS_URL sayfalama sabiti kur KODLANDI)
-  const STATUS_URL = `${BASE_LIST_URL}?page=`; // ör: ...?page=1
+  const STATUS_URL = `${BASE_LIST_URL}status=returnprocess&page=`; // ör: ...?status=returnprocess&page=1
 
   // MADDE 2.2 (SOLD_BASE_URL sayfalama şablonu kur KODLANDI)
-  const SOLD_BASE_URL = `${BASE_LIST_URL}?page={PAGE}`;
+  const SOLD_BASE_URL = `${BASE_LIST_URL}status=returnprocess&page={page}`;
 
   // MADDE 2.3 (BASE_URL sayfalama şablonu kur KODLANDI)
-  const BASE_URL = `${BASE_LIST_URL}?page={PAGE}`;
+  const BASE_URL = `${BASE_LIST_URL}status=returnprocess&page={page}`;
 
   // MADDE 2.4 (Anabayınız sipariş arama URL’i kur KODLANDI)
   const ANABAYI_SEARCH = 'https://anabayiniz.com/orders?search=';
@@ -440,7 +440,7 @@
 
   // MADDE 2 (Sayfa URL’ini base + page ile üret KODLANDI)
   function buildListPageUrl(page) {
-    return `${BASE_LIST_URL}?page=${Number(page || 1)}`;
+    return `${BASE_LIST_URL}status=returnprocess&page=${Math.max(1, Number(page || 1))}`;
   }
 
   // MADDE 4.3 (SMM id yakalama fonksiyonu kur KODLANDI)
@@ -781,7 +781,7 @@
       await randomDelay();
 
       // MADDE 12.2 (Doğru sayfa URL’i ile gezin KODLANDI)
-      const url = `${STATUS_URL}${p}`; // https://hesap.com.tr/p/sattigim-ilanlar?page=1
+      const url = `${STATUS_URL}${p}`; // https://hesap.com.tr/p/sattigim-ilanlar?status=returnprocess&page=1
       await navigateAndWait(tabId, url);
 
       // MADDE 6 (Sayfa yüklendikten sonra içerik çek KODLANDI)
